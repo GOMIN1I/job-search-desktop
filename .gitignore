@@ -1,0 +1,23 @@
+node_modules/
+dist/
+out/
+release/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+.DS_Store
+CLAUDE_TASK.md
+_private/
+artifacts/private/
+artifacts/*.log
+playwright/.auth/
+# Локальные несинхронизируемые с iCloud рабочие папки (см. docs/BUILD.md)
+*.nosync
+*.nosync/

@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-build-package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon
+            target: mac
+          - os: windows-latest
+            target: win
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false" # подпись не настроена — см. docs/BUILD.md
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit & integration tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: E2E (real Electron window, synthetic data)
+        if: matrix.target == 'mac'
+        run: node scripts/e2e.mjs
+        env:
+          E2E_LANG: en
+
+      - name: Package (macOS arm64 dmg)
+        if: matrix.target == 'mac'
+        run: npx electron-builder --mac --arm64 --publish never
+
+      - name: Package (Windows x64 NSIS)
+        if: matrix.target == 'win'
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: E2E on Windows (packaged app)
+        if: matrix.target == 'win'
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path release/win-unpacked -Filter "*.exe" | Select-Object -First 1
+          $env:E2E_EXECUTABLE = $exe.FullName
+          $env:E2E_LANG = "en"
+          node scripts/e2e.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.target }}-artifacts
+          path: |
+            release/*.dmg
+            release/*.exe
+            artifacts/e2e-*.json
+            docs/screenshots/en-*.png
+          if-no-files-found: warn
+          retention-days: 14
