@@ -24,6 +24,7 @@ import { applyBackup, applyProfileImport, applyVacancyImport, exportBackup, prev
 import { toCsv } from "../importexport/csv";
 import { loadDemo } from "../demo/demo";
 import { backupTo, SCHEMA_VERSION, timestampSlug } from "../db/db";
+import { CATALOG, OLLAMA_BASE, OllamaManager } from "./ollama";
 
 export interface Platform {
   dataDir: string;
@@ -127,6 +128,15 @@ export function createApi(repo: Repo, platform: Platform) {
     return null;
   };
   const ai = new AiService(repo, aiSettings, transport);
+  const ollama = new OllamaManager({ downloadsDir: path.join(platform.dataDir, "downloads"), emit: (p) => platform.emit("models-progress", p) });
+  const useLocalModel = (model: string) => {
+    const cur = repo.getMeta<Partial<AiSettings>>("ai_settings", {});
+    repo.setMeta("ai_settings", { ...cur, provider: "openai_compatible", baseUrl: `${OLLAMA_BASE}/v1`, model, lastTest: { at: new Date().toISOString(), ok: true, message: msg("Локальная модель проверена", "Local model verified") } });
+    changed("ai");
+  };
+  const background = (job: string, fn: () => Promise<unknown>) => {
+    fn().catch((e) => repo.log("warn", "models", `${job}: ${(e as Error).message}`));
+  };
 
   const activeCandidate = (): string | null => {
     const cur = repo.getMeta<string | null>("active_candidate", null);
@@ -583,6 +593,54 @@ export function createApi(repo: Repo, platform: Platform) {
         if (e instanceof AiError) throw new ApiError(e.userMessage, e.code);
         throw e;
       }
+    },
+
+    // ---------- локальные модели ----------
+    "models.state": async () => {
+      const [status, catalog, engine] = await Promise.all([ollama.status(), ollama.catalog(), ollama.engineInfo()]);
+      const s = aiSettings();
+      return { status, catalog, engine, active: s.provider === "openai_compatible" && s.baseUrl.includes("11434") ? s.model : null, platform: platform.platform };
+    },
+    "models.installEngine": () => {
+      background("engine", () => ollama.installEngine().then(() => changed("models")));
+      return { started: true };
+    },
+    "models.startEngine": async () => {
+      const st = await ollama.startEngine();
+      changed("models");
+      return st;
+    },
+    "models.pull": (a) => {
+      const model = z.string().parse(a?.model);
+      if (!CATALOG.some((c) => c.model === model)) throw new ApiError(msg("Эта модель не из списка поддержанных", "This model is not in the supported list"));
+      background(model, async () => {
+        await ollama.pull(model);
+        platform.emit("models-progress", { job: model, phase: "verify" });
+        const v = await ollama.verify(model);
+        platform.emit("models-progress", { job: model, phase: v.ok ? "done" : "error", message: v.ok ? msg(`Проверено за ${v.seconds} с`, `Verified in ${v.seconds} s`) : msg(`Проверка не прошла: ${v.error}`, `Check failed: ${v.error}`), verified: v });
+        if (v.ok) useLocalModel(model);
+        changed("models");
+      });
+      return { started: true };
+    },
+    "models.cancel": (a) => ({ cancelled: ollama.cancel(z.string().parse(a?.job)) }),
+    "models.remove": async (a) => {
+      const model = z.string().parse(a?.model);
+      await ollama.remove(model);
+      const s = aiSettings();
+      if (s.provider === "openai_compatible" && s.model === model) {
+        const cur = repo.getMeta<Partial<AiSettings>>("ai_settings", {});
+        repo.setMeta("ai_settings", { ...cur, provider: "none" });
+      }
+      changed("models");
+      return { ok: true };
+    },
+    "models.use": async (a) => {
+      const model = z.string().parse(a?.model);
+      const v = await ollama.verify(model);
+      if (!v.ok) throw new ApiError(msg(`Модель не прошла проверку: ${v.error}`, `The model failed the check: ${v.error}`));
+      useLocalModel(model);
+      return v;
     },
 
     // ---------- данные ----------

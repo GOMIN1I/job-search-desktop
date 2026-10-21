@@ -4,6 +4,7 @@ import { useI18n, type TKey } from "../i18n";
 import { call } from "../api";
 import { useApp } from "../state";
 import { DemoBadge, Empty, FitBadge, Icon, LifeBadge, useBusy } from "../components/ui";
+import { RunPanel } from "../components/RunPanel";
 
 interface Item { id: string; title: string; company: string; fit: any; relevance: number | null; nextStep: any; lifecycle: any; firstSeenAt: string; isDemo: boolean; lastChangedAt: string | null }
 interface Summary {
@@ -36,7 +37,6 @@ export function Today() {
   const notDue = att.filter((a) => a.status === "not_due").length;
   const considered = att.filter((a) => a.status !== "disabled").length;
   const sched = s.search.schedule;
-  const statusBadge = (st: string) => (st === "succeeded" ? "b-ok" : st === "partial" ? "b-warn" : st === "failed" ? "b-bad" : "b-neutral");
   const nothing = s.fresh.length === 0 && s.changed.length === 0;
 
   return (
@@ -51,65 +51,25 @@ export function Today() {
         </div>
         {app.candidate!.isDemo && <div className="banner banner-demo" style={{ marginBottom: 14 }}>{t("demo.note")}</div>}
 
-        <section className="card" aria-labelledby="st">
-          <div className="card-body status-card">
-            <div className="stack">
-              <h2 id="st">{t("today.status")}</h2>
-              {app.run.running ? (
-                <div className="stack">
-                  <div className="row"><Icon.refresh className="nav-icon" /><span>{t("today.running")} {app.run.progress?.sourceId ?? ""}</span></div>
-                  <div className="progress indeterminate" style={{ width: 280 }}><div /></div>
-                </div>
-              ) : lr ? (
-                <div className="stack" style={{ gap: 4 }}>
-                  <div className="row-wrap">
-                    <span className="subtle">{t("today.lastRun")}:</span>
-                    <strong>{date(lr.finishedAt ?? lr.startedAt, true)}</strong>
-                    <span className={`badge ${statusBadge(lr.status)}`}>{t(`run.status.${lr.status}` as TKey)}</span>
-                    <span className="muted small">{t(`run.trigger.${lr.trigger}` as TKey)}</span>
-                  </div>
-                  <span className="small subtle">{t("run.summary", { new: lr.stats.newVacancies, changed: lr.stats.changedVacancies, unchanged: lr.stats.unchangedVacancies, merged: lr.stats.mergedFallback, policy: lr.stats.policyBlocked })}</span>
-                </div>
-              ) : (
-                <span className="subtle">{t("today.noRuns")}</span>
-              )}
-              <div className="row-wrap small">
-                <span className="subtle">{t("today.schedule")}:</span>
-                {sched.enabled ? (
-                  sched.paused ? <span className="badge b-warn">{t("today.schedulePaused")}</span> : <span>{t(sched.cadence === "daily" ? "set.sched.daily" : "set.sched.weekly")} {sched.time}{s.search.nextRun ? ` · ${t("today.nextRun")}: ${date(s.search.nextRun, true)}` : ""}</span>
-                ) : (
-                  <span className="muted">{t("today.scheduleOff")}</span>
-                )}
-                <button className="btn-link small" onClick={() => app.go("settings")}>{t("nav.settings")}</button>
-              </div>
-              {sched.enabled && <span className="help">{t("today.localNote")}</span>}
-              {att.length > 0 && (
-                <div className="src-pills" aria-label={t("today.coverage")}>
-                  {att.map((a) => (
-                    <span key={a.id} className={`badge ${a.status === "success" ? "b-ok" : a.status === "partial" || a.status === "not_due" ? "b-warn" : a.status === "failed" || a.status === "blocked" ? "b-bad" : "b-neutral"}`} title={a.error ?? ""}>
-                      {a.sourceId} · {t(`att.${a.status}` as TKey)}{a.items ? ` · ${a.items}` : ""}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="stack" style={{ alignItems: "flex-end" }}>
-              {app.run.running ? (
-                <button className="btn" onClick={() => void app.cancelRun()}>{t("today.cancel")}</button>
-              ) : (
-                <button className="btn btn-primary btn-lg" onClick={() => void app.startRun()}><Icon.search className="nav-icon" />{t("today.runNow")}</button>
-              )}
-            </div>
-          </div>
-        </section>
+        <RunPanel lastRun={lr} />
+        <div className="row-wrap small" style={{ marginTop: 10 }}>
+          <span className="subtle">{t("today.schedule")}:</span>
+          {sched.enabled ? (
+            sched.paused ? <span className="badge b-warn">{t("today.schedulePaused")}</span> : <span>{t(sched.cadence === "daily" ? "set.sched.daily" : "set.sched.weekly")} {sched.time}{s.search.nextRun ? `, ${t("today.nextRun").toLowerCase()} ${date(s.search.nextRun, true)}` : ""}</span>
+          ) : (
+            <span className="muted">{t("today.scheduleOff")}</span>
+          )}
+          <button className="btn-link small" onClick={() => app.go("settings")}>{t("nav.settings")}</button>
+        </div>
+        {sched.enabled && <p className="help" style={{ marginTop: 4 }}>{t("today.localNote")}</p>}
 
-        <div className="grid-3" style={{ marginTop: 14 }}>
-          <button className="metric" style={{ border: 0, textAlign: "left", cursor: "pointer" }} onClick={() => app.go("vacancies")}><span className="v">{s.counts.suitable}</span><span className="l">{t("fit.suitable")}</span></button>
-          <button className="metric" style={{ border: 0, textAlign: "left", cursor: "pointer" }} onClick={() => app.go("vacancies")}><span className="v">{s.counts.needsCheck}</span><span className="l">{t("fit.needs_check")}</span></button>
-          <button className="metric" style={{ border: 0, textAlign: "left", cursor: "pointer" }} onClick={() => app.go("applications")}><span className="v">{s.counts.saved + s.counts.preparing + s.counts.submitted}</span><span className="l">{t("nav.applications")}</span></button>
+        <div className="metric-row">
+          <button className="metric" onClick={() => app.go("vacancies")}><span className="v">{s.counts.suitable}</span><span className="l"><FitBadge fit="suitable" /></span></button>
+          <button className="metric" onClick={() => app.go("vacancies")}><span className="v">{s.counts.needsCheck}</span><span className="l"><FitBadge fit="needs_check" /></span></button>
+          <button className="metric" onClick={() => app.go("applications")}><span className="v">{s.counts.saved + s.counts.preparing + s.counts.submitted}</span><span className="l subtle">{t("nav.applications")}</span></button>
         </div>
 
-        <div className="grid-2" style={{ marginTop: 14 }}>
+        <div className="grid-2" style={{ marginTop: 18 }}>
           <section className="card" aria-labelledby="new">
             <div className="card-header"><h2 id="new">{t("today.new")}</h2><span className="muted small">{s.fresh.length}</span></div>
             <div className="card-body">
@@ -141,7 +101,7 @@ export function Today() {
                   <div className="section-title" style={{ marginTop: 0 }}>{t("today.followups")}</div>
                   {s.followUps.map((f) => (
                     <button key={f.application.id} className="mini-item" onClick={() => app.go("applications", { applicationVacancyId: f.application.vacancyId })}>
-                      <span><span className="t">{f.vacancy?.title ?? "—"}</span><br /><span className="s">{f.vacancy?.company} · {t(`stage.${f.application.stage}` as TKey)}</span></span>
+                      <span><span className="t">{f.vacancy?.title ?? "—"}</span><br /><span className="s">{f.vacancy?.company}, {t(`stage.${f.application.stage}` as TKey)}</span></span>
                       <span className="badge b-warn"><Icon.clock />{date(f.application.followUpAt)}</span>
                     </button>
                   ))}
@@ -187,7 +147,7 @@ function MiniItem({ v, onOpen }: { v: Item; onOpen: () => void }) {
       <span style={{ minWidth: 0 }}>
         <span className="t">{v.title}</span>
         <br />
-        <span className="s">{v.company} · {m(v.nextStep)}</span>
+        <span className="s">{v.company}, {m(v.nextStep)}</span>
       </span>
       <span className="row"><LifeBadge life={v.lifecycle} /><FitBadge fit={v.fit} /></span>
     </button>

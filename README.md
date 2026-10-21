@@ -1,86 +1,157 @@
-# Job Search Desktop
+<p align="center"><img src="build/icon.svg" width="96" height="96" alt=""></p>
 
-**Сам находит варианты и помогает понять, какие заслуживают твоего времени.**
+<h1 align="center">Job Search Desktop</h1>
 
-Локальное desktop-приложение для macOS и Windows: один раз задаёте профиль, цели и ограничения — приложение регулярно собирает объявления из поддержанных источников, убирает дубли, проверяет условия, честно показывает неизвестное и помогает с документами и откликами. **Отправку отклика всегда выполняете вы.** Интерфейс на русском и английском.
+<p align="center"><b>Находит вакансии и отмечает главное: что подходит, что уточнить, что нет.</b><br>
+Бесплатное приложение для macOS и Windows. Интерфейс на русском и английском.</p>
 
-> English summary is [below](#english).
+<p align="center">
+  <a href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg"><b>Скачать для macOS</b></a> (Apple Silicon)
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <a href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe"><b>Скачать для Windows</b></a> (x64)
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <a href="https://gomin1i.github.io/job-search-desktop/">Сайт и ролик</a>
+</p>
 
-![Сегодня](docs/screenshots/ru-06-today-demo.png)
+<p align="center"><a href="https://gomin1i.github.io/job-search-desktop/#film"><img src="site/media/poster.jpg" width="720" alt="Ролик о приложении (58 секунд), открывается на сайте"></a></p>
+
+> English version is [below](#english).
+
+Вы один раз говорите, что вам подходит: страна, языки, направления, минимальная оплата, без звонков или со звонками. Приложение само обходит открытые сайты с вакансиями, убирает дубли и проверяет каждое объявление по вашим условиям. Каждый вывод подтверждён цитатой из текста. Если в объявлении чего-то нет, оно помечено «уточнить», а не угадано. Отклик всегда отправляете вы.
+
+## Как это выглядит
+
+| Настройка за пару минут | Настоящий поиск по сайтам | Разбор вакансии и отклик |
+|---|---|---|
+| ![Настройка профиля](docs/media/demo-setup.gif) | ![Поиск по открытым источникам](docs/media/demo-search.gif) | ![Карточка вакансии с цитатами](docs/media/demo-results.gif) |
+| Знакомство, о вас, что ищете, где искать | Запись реального запуска, ускорено | Демо-данные, вымышленные компании |
+
+<table>
+<tr>
+<td><img src="docs/screenshots/ru-10-today-demo.png" alt="Экран «Сегодня»"></td>
+<td><img src="docs/screenshots/ru-11-vacancy-detail.png" alt="Карточка вакансии"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/ru-05b-onboarding-assistant-in-use.png" alt="Установка локальной модели"></td>
+<td><img src="docs/screenshots/ru-13-applications-board.png" alt="Доска откликов"></td>
+</tr>
+</table>
 
 ## Что умеет
 
-- **Онбординг без угадывания.** Цели (библиотека из 26 шаблонов направлений + свои), реальная страна/город/часовой пояс, формат (удалёнка/гибрид/офис), часы, языки письменно/устно, минимум оплаты по валютам, ограничения. У каждого условия — «обязательно / желательно / не задано». Неизвестное не подменяется предположением.
-- **Сбор из реальных источников:** Jobicy, Remotive, Remote OK, Himalayas, Working Nomads, We Work Remotely (RSS), Хабр Карьера (RSS) и публичные доски компаний на Greenhouse / Lever / Ashby. Соблюдаются официальные лимиты: минимальный интервал опроса, пауза между страницами, повтор с backoff, `Retry-After`, отмена. Покрытие каждого источника видно (страницы, лимит на страницу, окно давности).
-- **Политика исключённых источников.** hh.ru и бренды HeadHunter исключены в любой форме — прямые адреса, поддомены, зеркала, редиректы, ссылки внутри текста и импортируемых файлов. Список дополняется пользователем.
-- **Единая функция решения.** Отдельные измерения: жизненный цикл объявления (открыто / закрыто / не подтверждено / не проверено), соответствие человеку (подходит / не подходит / уточнить), условия (страна, оплата, опыт, язык, звонки, часы, формат, безопасность) с цитатой-доказательством и статусом факта, рабочий этап человека и статус документа. Высокое совпадение не обходит жёсткий отказ или неизвестное; «Worldwide/EMEA» не доказывает найм из вашей страны; «до», оценка площадки и почасовая ставка без гарантированных часов не выполняют месячный минимум; часы пересчитываются в ваш часовой пояс с учётом перехода на летнее время.
-- **Дедупликация с журналом:** ID источника → канонический URL → requisition ATS → осторожное сравнение компании+названия+локации+текста. Разные города и requisition не склеиваются; fallback-слияние обратимо кнопкой «Разъединить».
-- **Наблюдения и история:** новое / изменилось / без изменений; история фактов и оценок; смена профиля создаёт новую версию и пересчитывает оценки, не переписывая прошлые.
-- **Перепроверка первичной карточки:** 403/429/5xx/CAPTCHA/JS-оболочка/сеть не считаются закрытием; 404 и редирект на каталог хранятся отдельно от явного закрытия работодателем.
-- **Отклики:** этапы (сохранено → готовлю → отправлено вручную → ответ → интервью → оффер / отказ / архив), чек-лист, напоминания, документы по версиям. «Открыть оригинал» не означает «отклик отправлен».
-- **Документы:** импорт файлов (с проверкой доступности), черновики CV и писем **только из подтверждённых фактов** (шаблон без AI или AI), редактирование с версиями, сравнение версий, экспорт PDF/HTML/Markdown/TXT. Если работодатель запрещает AI-ответы, AI-генерация для этой заявки блокируется.
-- **AI по делу:** извлечение требований в структурированный JSON с проверкой схемы и **проверкой, что каждая цитата действительно есть в тексте** (иначе факт отбрасывается). Провайдеры: Anthropic (официальный SDK) и любой OpenAI-совместимый (OpenAI, OpenRouter, локальные Ollama / LM Studio). Кэш по hash объявления+профиля+версии промпта+модели, месячный бюджет, журнал вызовов. Без AI работает всё, кроме AI-кнопок.
-- **Локальное расписание:** ежедневно/еженедельно, пауза, следующий запуск, журнал пропусков, один догоняющий запуск после сна, защита от параллельного запуска, уведомления без повторов. **Это локальный таймер:** при выключенном компьютере поиск не идёт.
-- **Данные у вас:** SQLite в папке пользователя, миграции с резервной копией, импорт CSV/JSON (экспорт Notion/Excel) и профилей с предпросмотром, транзакцией и откатом, повторный импорт без дублей, полный экспорт JSON, экспорт подборки в CSV. Ключи — в системном хранилище (Keychain/DPAPI).
-- **Демо-режим** на вымышленных данных, явно помечен и никогда не смешивается с реальными кандидатами.
+- **Простой первый запуск.** Шесть шагов простыми словами: что делает приложение, о вас, что ищете, где искать, помощник (нейросеть), первый поиск и объяснение результатов. Есть «Назад», черновик сохраняется, любой шаг можно пропустить. Подсказки по экрану открываются снова из «Как это работает».
+- **Поиск по открытым источникам:** Jobicy, Remotive, Remote OK, Himalayas, Working Nomads, We Work Remotely, Хабр Карьера и публичные доски компаний на Greenhouse, Lever и Ashby. Приложение соблюдает их лимиты и правила, прогресс по каждому сайту виден во время поиска.
+- **Маркер вместо догадок.** Каждое условие отмечено: ✓ подходит, ? уточнить, ✕ не подходит. Цвет всегда дублируется значком и словом. «Worldwide» не считается доказательством найма из вашей страны, «до $1000» не выполняет минимум, часы пересчитываются в ваш часовой пояс.
+- **Отклики под контролем.** Этапы, чек-лист перед отправкой, напоминания, черновики писем и резюме только из подтверждённых фактов вашего профиля, версии документов. Приложение ничего не отправляет само.
+- **Нейросеть на вашем компьютере.** Ollama и модели Gemma ставятся прямо из настроек (подробнее ниже). Облачная модель тоже возможна, но не обязательна. Без нейросети работает всё, кроме кнопок «Разобрать с AI».
+- **Данные у вас.** База SQLite в папке пользователя, резервные копии перед миграциями и импортом, импорт CSV/JSON, полный экспорт. Ключи облачных моделей хранятся в системном хранилище (Keychain/DPAPI).
+- **Расписание.** Ежедневный или еженедельный поиск, пока приложение запущено (это локальный таймер: на выключенном компьютере поиск не идёт).
+- **Демо-режим** на вымышленных данных, явно помеченный и отдельный от ваших.
 
 ## Установка
 
-| Платформа | Сборка | Статус |
-|---|---|---|
-| macOS Apple Silicon | `Job Search Desktop-0.1.0-arm64.dmg` | собрана и запущена локально; **не подписана и не нотаризована** |
-| Windows x64 | NSIS-установщик из CI (`.github/workflows/ci.yml`) | конфигурация готова; на Windows ещё не запускалась |
+### macOS
 
-Неподписанное приложение macOS при первом запуске: правый клик → «Открыть» (или `xattr -dr com.apple.quarantine "/Applications/Job Search Desktop.app"`). Подробнее — [docs/BUILD.md](docs/BUILD.md).
+1. Скачайте [Job-Search-Desktop-mac-arm64.dmg](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg) и откройте его.
+2. Перетащите приложение в «Программы».
+3. Сборка пока не подписана сертификатом Apple, поэтому при первом запуске macOS его не откроет. Попробуйте открыть один раз, затем зайдите в «Системные настройки», раздел «Конфиденциальность и безопасность», и нажмите «Всё равно открыть».
+
+Требования: macOS 13 или новее, Mac на Apple Silicon (M1 и новее). Сборки для Intel-Mac пока нет.
+
+### Windows
+
+1. Скачайте [Job-Search-Desktop-windows-x64-setup.exe](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe) и запустите.
+2. Установщик не подписан, поэтому SmartScreen предупредит: нажмите «Подробнее», затем «Выполнить в любом случае».
+3. Можно выбрать папку установки; ярлык появится в меню «Пуск».
+
+Требования: Windows 10 или 11, 64-бит.
+
+### Ресурсы
+
+| | Само приложение | С локальной нейросетью |
+|---|---|---|
+| Память | около 450 МБ при работе | лёгкая модель: от 8 ГБ ОЗУ, точная: от 16 ГБ |
+| Диск | около 400 МБ | плюс Ollama (≈ 0,2 ГБ на Mac, ≈ 1,7 ГБ на Windows) и модель (4,6 или 6,6 ГБ) |
+| Интернет | только для поиска вакансий | плюс однократная загрузка модели |
+
+## Нейросеть: локально и бесплатно
+
+В разделе «Настройки», вкладка «AI» (и на шаге «Помощник» первого запуска):
+
+| Модель | Загрузка | Нужно памяти | Кому подходит |
+|---|---|---|---|
+| **Лёгкая:** Gemma 4 E2B (`gemma4:e2b`) | ≈ 4,6 ГБ | от 8 ГБ ОЗУ | ноутбуки, быстрее отвечает |
+| **Точнее:** Gemma 4 E4B (`gemma4:e4b`) | ≈ 6,6 ГБ | от 16 ГБ ОЗУ | точнее с деталями, медленнее |
+
+- Перед загрузкой показан размер, требования к памяти, ваша память и свободное место на диске. Приложение рекомендует модель под ваш компьютер. Ничего большого не скачивается без вашего нажатия и подтверждения.
+- Во время загрузки видны прогресс и скорость. Загрузку можно остановить и продолжить с того же места. Ошибки объясняются простыми словами.
+- После загрузки модель проверяется настоящим разбором тестовой вакансии и только затем включается. Модель можно удалить одной кнопкой.
+- Если Ollama ещё не установлена, приложение скачивает официальный установщик с GitHub-релиза Ollama и проверяет его контрольную сумму SHA-256. На Mac Ollama распаковывается в `~/Applications` и запускается; на Windows открывается официальный установщик.
+
+**Что остаётся на компьютере:** при локальной модели текст вакансий и ваш профиль обрабатываются только на вашем компьютере. В интернет уходят лишь запросы к сайтам с вакансиями и однократная загрузка Ollama и модели. Облачная модель (Anthropic или любой OpenAI-совместимый сервис) включается отдельно, по вашему ключу.
+
+Замер на 5 реальных вакансиях (MacBook Pro M4 Pro, 24 ГБ): E2B вернула корректный разбор в 4 случаях из 5, в среднем за 12,6 с; E4B вернула корректный разбор во всех 5, в среднем за 24,6 с. Интерфейс во время разбора не тормозит: клик обрабатывается за 25 мс. Данные замера лежат в `artifacts/`.
+
+## Что проверено, а что нет
+
+- **macOS (Apple Silicon):** собранный `.dmg` установлен и запущен; автотесты окна (E2E) пройдены на русском и английском для исходников и собранного приложения; замерена производительность. Установка Ollama и загрузка модели проверены на настоящем движке: остановка на 35 %, продолжение, проверка, удаление.
+- **Windows:** установщик собирается в GitHub Actions на `windows-latest`, там же запускаются E2E и замер производительности собранного приложения. На настоящем компьютере с Windows установщик вручную не проверялся.
+- Сборки не подписаны и не нотаризованы.
+
+## Чего нет
+
+- Облачного сервера нет: поиск по расписанию идёт, только пока приложение запущено.
+- Охват неполный: ленты отдают последние объявления, а не весь рынок.
+- Нет экспорта в DOCX (есть PDF, HTML, Markdown, TXT); текст из импортированных PDF/DOCX не извлекается.
+- hh.ru и сервисы HeadHunter не используются ни в каком виде.
 
 ## Разработка
 
-Требуется Node.js 22+ (проверено на 24/25).
+Нужен Node.js 22 или новее (проверено на 24 и 25).
 
 ```bash
 npm ci
 npm run typecheck
-npm test            # 84 модульных/интеграционных теста (Vitest)
-npm run build
-npm start           # сборка и запуск Electron
-npm run dev         # Vite + Electron с горячей перезагрузкой renderer
-npm run e2e         # настоящее окно Electron на синтетических данных + скриншоты
-npm run dist:mac    # dmg для Apple Silicon
-npm run dist:win    # NSIS для Windows x64 (на Windows или в CI)
+npm test
+npm start
 ```
 
-CLI с теми же функциями ядра: `node dist/cli.js run | reassess | import-profile <file> | import-vacancies <file> | ai-test | summary [--data <dir>]`.
+| Команда | Что делает |
+|---|---|
+| `npm run dev` | Vite и Electron с горячей перезагрузкой интерфейса |
+| `npm run e2e` | настоящее окно Electron на синтетических данных, скриншоты в `docs/screenshots/` |
+| `npm run dist:mac` | `.dmg` для Apple Silicon |
+| `npm run dist:win` | NSIS-установщик для Windows x64 (на Windows или в CI) |
+| `node scripts/perf.mjs` | замер времени запуска, памяти и отклика интерфейса |
+| `node scripts/record-demos.mjs <папка>` | запись демо-видео для сайта и ролика |
+| `node dist/cli.js run \| reassess \| ai-bench \| ollama-selftest \| summary` | те же функции из командной строки |
 
-## Архитектура
+Структура: `src/core` (правила и решение), `src/db` (SQLite), `src/sources` (адаптеры сайтов), `src/pipeline` (поиск), `src/ai` (модели), `src/main` (Electron, IPC, Ollama), `src/renderer` (интерфейс на React). Ролик собирается из `film/` (Remotion, музыка синтезируется на numpy, мастер в ffmpeg: `bash film/make_film.sh`). Сайт лежит в `site/` и публикуется на GitHub Pages.
 
-`src/shared` — типы · `src/core` — правила (факты, деньги, часовые пояса, география, классификация, дедупликация, решение, расписание) · `src/db` — SQLite (node:sqlite), миграции, репозиторий · `src/sources` — HTTP-клиент и адаптеры · `src/pipeline` — прогон поиска и перепроверка · `src/ai` — провайдеры, промпты, сервис · `src/importexport`, `src/docs`, `src/demo` · `src/main` — Electron main, IPC-API, воркер, preload · `src/renderer` — React-интерфейс. Подробности и решения — [docs/DECISIONS.md](docs/DECISIONS.md), источники — [docs/SOURCES.md](docs/SOURCES.md), дизайн — [docs/DESIGN.md](docs/DESIGN.md).
+Документация: [дизайн](docs/DESIGN.md), [сборка и подпись](docs/BUILD.md), [источники](docs/SOURCES.md), [решения](docs/DECISIONS.md), [статус](IMPLEMENTATION_STATUS.md).
 
 ## Приватность
 
-Все данные локальны. Сеть: только включённые источники, выбранный AI-провайдер (текст вакансии и выбранные факты — только по нажатию AI-кнопки) и страница вакансии при «Перепроверить». Приложение не отправляет отклики, письма и формы, не регистрирует аккаунты и не проходит тесты за пользователя. Ключи не попадают в renderer, журнал и экспорт.
-
-## Чего нет (честно)
-
-- Нет облачного исполнителя: расписание работает, только пока приложение запущено.
-- Нет живой синхронизации с Notion (есть импорт CSV/JSON-экспорта).
-- Нет DOCX-экспорта (есть PDF/HTML/MD/TXT); текст из PDF/DOCX при импорте не извлекается — файл хранится и открывается.
-- Охват неполный: ленты отдают первые страницы/последние объявления; полный рынок не покрывается.
-- Подпись кода/нотаризация не настроены.
+Все данные хранятся локально. Приложение ходит в сеть только к включённым сайтам с вакансиями, к выбранной модели (если она облачная) и к странице вакансии, когда вы нажимаете «Перепроверить». Оно не отправляет отклики, письма и формы, не регистрирует аккаунты и не проходит тесты за вас.
 
 ## Лицензия
 
-MIT — см. [LICENSE](LICENSE).
+Код: MIT, см. [LICENSE](LICENSE). Шрифт Golos Text: SIL OFL 1.1. Модели Gemma распространяются на условиях [Gemma Terms of Use](https://ollama.com/library/gemma4); Ollama: MIT.
 
 ---
 
 ## English
 
-**Finds options for you and helps you see which ones deserve your time.**
+**Finds jobs and marks what matters: what fits, what to clarify, what doesn't.** A free desktop app for macOS and Windows with a Russian and English interface.
 
-A local desktop app (macOS, Windows) with a Russian/English UI. Set your profile, goals and constraints once; the app collects postings from supported sources (Jobicy, Remotive, Remote OK, Himalayas, Working Nomads, We Work Remotely RSS, Habr Career RSS, Greenhouse/Lever/Ashby company boards) within their official rate limits, de-duplicates them with a reversible merge log, extracts facts with quoted evidence, and assesses each job **per candidate** with one decision function: hard constraints that fail → "does not fit"; hard constraints that are unknown → "clarify"; only fully confirmed → "fits". "Worldwide" never proves hiring from your country; "up to", platform estimates and hourly rates without guaranteed hours never satisfy a monthly minimum; working hours are converted to your time zone with DST. Lifecycle (open / closed / unconfirmed / not checked) is separate from fit; HTTP errors never count as employer closure.
+Downloads: [macOS (Apple Silicon)](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg), [Windows x64](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe), [website and film](https://gomin1i.github.io/job-search-desktop/).
 
-Applications are tracked by stage with checklists, follow-ups and versioned documents. CV/letter drafts are built only from proven profile facts (template or AI); AI generation is blocked when the employer forbids AI-generated applications. AI (Anthropic via the official SDK, or any OpenAI-compatible endpoint incl. local Ollama/LM Studio) only extracts requirements into schema-validated JSON and every quote is verified against the posting text. Results are cached, budgeted and logged. Everything except AI buttons works without AI.
+Tell the app once what works for you: country, languages, job areas, minimum pay, calls or no calls. It checks open job sites (Jobicy, Remotive, Remote OK, Himalayas, Working Nomads, We Work Remotely, Habr Career, and public Greenhouse, Lever and Ashby boards) within their limits, removes duplicates, and checks every posting against your rules. Each verdict is backed by a quote from the posting; anything the posting doesn't say is marked "clarify" instead of guessed. You always send applications yourself.
 
-Data stays local (SQLite in the user profile, backups before migrations/imports, idempotent CSV/JSON import, JSON export). Keys are stored with the OS key store. hh.ru and HeadHunter brands are excluded in any form. The local scheduler only runs while the app is running. **You submit every application yourself.**
+- **First run in six plain steps,** with back, saved progress, skippable steps, and an on-screen tour you can reopen.
+- **Local AI, free:** install Ollama and Gemma 4 E2B (≈ 4.6 GB, 8 GB RAM) or E4B (≈ 6.6 GB, 16 GB RAM) from inside the app. You see size and requirements first, get a recommendation, and confirm before anything large downloads. Progress, pause and resume, verification, and removal are built in. With a local model, posting text and your profile never leave your computer. Cloud models (Anthropic or any OpenAI-compatible API) are optional.
+- **Install on macOS:** open the `.dmg`, drag the app to Applications. The build is not signed yet: open it once, then go to System Settings, Privacy & Security, and click Open Anyway. Requires macOS 13+ on Apple Silicon.
+- **Install on Windows:** run the installer; SmartScreen will warn because it is unsigned: click More info, then Run anyway. Requires Windows 10 or 11, 64-bit.
+- **Verified:** the macOS build was installed and run, with E2E tests (RU and EN) and performance measured. The Windows installer is built and E2E-tested on GitHub Actions `windows-latest`; it has not been checked by hand on a physical Windows PC.
 
-Build: `npm ci && npm test && npm run dist:mac` (or `dist:win`). The macOS build is unsigned; Windows packaging runs in CI and has not yet been launched on Windows. License: MIT.
+Development: `npm ci && npm test && npm start`. License: MIT.

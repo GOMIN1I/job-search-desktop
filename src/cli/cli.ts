@@ -14,7 +14,8 @@ import { Repo } from "../db/repo";
 import { assessAll, refreshFacts, runSearch } from "../pipeline/run";
 import { applyProfileImport, applyVacancyImport, previewVacancyImport, readVacancyFile } from "../importexport/importer";
 import { OpenAICompatibleTransport } from "../ai/transports";
-import { AiService, DEFAULT_AI_SETTINGS } from "../ai/service";
+import { AiService, DEFAULT_AI_SETTINGS, mergeExtraction } from "../ai/service";
+import { EXTRACT_JSON_SCHEMA, EXTRACT_SYSTEM, ExtractSchema, extractUserPrompt } from "../ai/prompts";
 
 function defaultDataDir(): string {
   const name = "Job Search Desktop";
@@ -89,6 +90,79 @@ async function main() {
       for (const v of repo.listVacanciesForCandidate(c.id)) fits[c.id][v.fit ?? "none"] = (fits[c.id][v.fit ?? "none"] ?? 0) + 1;
     }
     console.log(JSON.stringify({ refreshed, reassessed: changed.length, fits }, null, 2));
+    return;
+  }
+  if (cmd === "ai-bench") {
+    // Сравнение локальных моделей на нашей задаче: валидность ответа, время, отброшенные цитаты.
+    const repo = open();
+    const models = (opt("models", "gemma4:e2b,gemma4:e4b") as string).split(",");
+    const n = Number(opt("n", "5"));
+    const vs = repo.allActiveVacancies().filter((v) => v.postingKind === "job_posting" && v.description.length > 800 && !v.isDemo).slice(0, n);
+    const report: Record<string, unknown>[] = [];
+    for (const model of models) {
+      const t = new OpenAICompatibleTransport(opt("base", "http://localhost:11434/v1")!, null, model);
+      let valid = 0, seconds = 0, dropped = 0, items = 0, summaryLangOk = 0;
+      for (const v of vs) {
+        const started = Date.now();
+        try {
+          const r = await t.complete({ system: EXTRACT_SYSTEM, user: extractUserPrompt(v), schema: EXTRACT_JSON_SCHEMA as any, maxTokens: 3000 });
+          const parsed = ExtractSchema.safeParse(JSON.parse(r.text.replace(/^```(?:json)?|```$/g, "").trim()));
+          if (parsed.success) {
+            valid++;
+            const merged = mergeExtraction(v, parsed.data, model);
+            dropped += merged.dropped.length;
+            items += parsed.data.required_skills.length + parsed.data.preferred_skills.length + parsed.data.languages.length + parsed.data.hiring_locations.length;
+            if (/[а-яё]/i.test(parsed.data.summary_ru)) summaryLangOk++;
+          }
+        } catch {
+          /* считается невалидным ответом */
+        }
+        seconds += (Date.now() - started) / 1000;
+      }
+      const row = { model, vacancies: vs.length, validJson: valid, avgSeconds: +(seconds / Math.max(1, vs.length)).toFixed(1), droppedQuotes: dropped, extractedItems: items, russianSummary: summaryLangOk };
+      console.log(JSON.stringify(row));
+      report.push(row);
+    }
+    const outFile = opt("out");
+    if (outFile) fs.writeFileSync(outFile, JSON.stringify({ at: new Date().toISOString(), host: { ramGb: Math.round(os.totalmem() / 1024 ** 3), arch: process.arch }, report }, null, 2));
+    return;
+  }
+  if (cmd === "ollama-selftest") {
+    // Реальная проверка интеграции на маленькой модели: загрузка → обрыв → продолжение → список → удаление.
+    const { OllamaManager } = await import("../main/ollama");
+    const model = opt("model", "smollm2:135m")!;
+    const log: string[] = [];
+    let cancelAt = Number(opt("cancel-at", "0.35"));
+    const mgr: any = new OllamaManager({
+      downloadsDir: path.join(os.tmpdir(), "jsd-selftest"),
+      emit: (p) => {
+        if (p.total && p.completed !== undefined) {
+          const frac = p.completed / p.total;
+          if (cancelAt > 0 && frac >= cancelAt) {
+            log.push(`cancel at ${(frac * 100).toFixed(0)}%`);
+            cancelAt = 0;
+            mgr.cancel(model);
+          }
+        }
+        if (p.phase !== "pull") log.push(`${p.phase}${p.total ? ` ${p.completed}/${p.total}` : ""}`);
+      },
+    });
+    const st0 = await mgr.status();
+    log.push(`engine ${st0.state} ${st0.version}`);
+    try {
+      await mgr.pull(model, { allowAny: true });
+    } catch (e) {
+      log.push(`first pull stopped: ${(e as Error).message}`);
+    }
+    const started = Date.now();
+    await mgr.pull(model, { allowAny: true });
+    log.push(`resumed and finished in ${((Date.now() - started) / 1000).toFixed(1)} s`);
+    const st1 = await mgr.status();
+    log.push(`listed after pull: ${st1.models.some((m: { name: string }) => m.name.startsWith(model))}`);
+    await mgr.remove(model);
+    const st2 = await mgr.status();
+    log.push(`listed after remove: ${st2.models.some((m: { name: string }) => m.name.startsWith(model))}`);
+    console.log(log.join("\n"));
     return;
   }
   if (cmd === "summary") {

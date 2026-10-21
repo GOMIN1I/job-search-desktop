@@ -171,7 +171,9 @@ function updateTray() {
 }
 
 function createTray() {
-  const ip = iconPath();
+  // Для трея — упрощённая иконка (крупная карточка и маркерная полоса), читаемая в 16–18 px.
+  const small = [path.join(process.resourcesPath ?? "", "tray.png"), path.join(app.getAppPath(), "build", "icon-32.png"), path.join(__dirname, "..", "..", "build", "icon-32.png")].find((p) => fs.existsSync(p));
+  const ip = small ?? iconPath();
   if (!ip) return;
   const img = nativeImage.createFromPath(ip).resize({ width: 18, height: 18 });
   tray = new Tray(img);
@@ -187,7 +189,7 @@ function createWindow() {
     minHeight: 600,
     show: false,
     title: "Job Search Desktop",
-    backgroundColor: "#f7f8f8",
+    backgroundColor: "#f6f8f4",
     icon: iconPath() || undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),

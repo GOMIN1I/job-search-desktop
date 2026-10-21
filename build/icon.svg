@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#11735C"/>
+      <stop offset="1" stop-color="#074537"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#021F18" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="190" fill="url(#bg)"/>
+  <g transform="rotate(-8 512 520)" filter="url(#sh)">
+    <rect x="292" y="232" width="440" height="576" rx="52" fill="#FFFFFF"/>
+    <rect x="356" y="320" width="230" height="34" rx="17" fill="#C3CEC9"/>
+    <rect x="356" y="400" width="312" height="26" rx="13" fill="#DCE4E0"/>
+    <path d="M334 492 C 420 478, 560 482, 700 476 C 712 476, 720 486, 718 500 L 712 566 C 711 578, 702 584, 690 584 C 560 588, 430 590, 342 598 C 330 599, 322 590, 323 578 L 324 506 C 324 498, 328 493, 334 492 Z" fill="#D8F04A"/>
+    <path d="M372 538 l 34 34 l 66 -70" fill="none" stroke="#0B5D4B" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="356" y="650" width="280" height="26" rx="13" fill="#DCE4E0"/>
+    <rect x="356" y="712" width="200" height="26" rx="13" fill="#DCE4E0"/>
+  </g>
+</svg>

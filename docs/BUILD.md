@@ -22,7 +22,7 @@ hdiutil create -volname "Job Search Desktop" -srcfolder "<staging с .app и с�
 - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` — нотаризация через `notarytool`;
 - в `package.json → build.mac`: убрать `"identity": null`, включить `"hardenedRuntime": true`, добавить `"notarize": true` и entitlements (для Electron: `com.apple.security.cs.allow-jit`).
 
-Без подписи Gatekeeper предупреждает при первом запуске: правый клик → «Открыть».
+Без подписи Gatekeeper не даёт открыть приложение с первого раза (сборка подписана только ad-hoc). Откройте его один раз, затем «Системные настройки» → «Конфиденциальность и безопасность» → «Всё равно открыть». В новых версиях macOS правый клик → «Открыть» больше не обходит проверку.
 
 ## Windows x64
 

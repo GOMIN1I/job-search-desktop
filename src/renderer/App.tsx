@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Candidate, UiLang } from "../shared/types";
 import { I18nContext, makeI18n, translate, useI18n } from "./i18n";
 import { call, on } from "./api";
-import { AppContext, useApp, type AppInfo, type Page, type RunState } from "./state";
-import { Icon, ToastProvider, DemoBadge, useToast } from "./components/ui";
+import { AppContext, useApp, type AppInfo, type Lane, type Page, type RunState } from "./state";
+import { BrandMark, Icon, ToastProvider, DemoBadge, useToast } from "./components/ui";
+import { Guide } from "./components/Guide";
 import { Onboarding } from "./pages/Onboarding";
 import { Today } from "./pages/Today";
 import { Vacancies } from "./pages/Vacancies";
@@ -44,6 +45,8 @@ function Shell({ info, setInfo, setLang }: { info: AppInfo | null; setInfo: (i: 
   const [version, setVersion] = useState(0);
   const [run, setRun] = useState<RunState>({ running: false, runId: null, progress: null });
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [lanes, setLanes] = useState<Lane[]>([]);
+  const [guide, setGuide] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -67,7 +70,27 @@ function Shell({ info, setInfo, setLang }: { info: AppInfo | null; setInfo: (i: 
         setVersion((v) => v + 1);
         void call<Candidate[]>("candidates.list").then(setCandidates);
       }),
-      on("run-progress", (p) => setRun(p)),
+      on("run-progress", (p) => {
+        setRun(p);
+        const pr = p?.progress;
+        if (!pr) return;
+        setLanes((prev) => {
+          let next = prev;
+          if (pr.phase === "start" && pr.sources) {
+            next = pr.sources.map((s: { id: string; label: string; enabled: boolean }) => ({ id: s.id, label: s.label, state: s.enabled ? "wait" : "skip" }) as Lane);
+          }
+          if (pr.sourceId) {
+            next = next.map((l) => {
+              if (l.id !== pr.sourceId) return l;
+              if (!pr.status) return { ...l, state: "active" };
+              const st = pr.status as string;
+              const state: Lane["state"] = st === "success" || st === "partial" ? "done" : st === "not_due" || st === "disabled" || st === "not_configured" ? "skip" : st === "cancelled" ? "wait" : "fail";
+              return { ...l, state, status: st, items: pr.items ?? l.items };
+            });
+          }
+          return next;
+        });
+      }),
       on("run-finished", (p) => {
         setRun({ running: false, runId: p?.runId ?? null, progress: null });
         setVersion((v) => v + 1);
@@ -100,6 +123,8 @@ function Shell({ info, setInfo, setLang }: { info: AppInfo | null; setInfo: (i: 
       focusApplication,
       version,
       run,
+      lanes,
+      openGuide: () => setGuide(true),
       startRun: async () => {
         try {
           const r = await call<{ runId: string | null; error: string | null; alreadyRunning?: boolean }>("run.start");
@@ -113,7 +138,7 @@ function Shell({ info, setInfo, setLang }: { info: AppInfo | null; setInfo: (i: 
       },
       reload,
     }),
-    [info, candidates, candidate, page, focusVacancy, focusApplication, version, run, reload, push, fail],
+    [info, candidates, candidate, page, focusVacancy, focusApplication, version, run, lanes, reload, push, fail],
   );
 
   if (!info) return <div className="empty" style={{ height: "100%", justifyContent: "center" }}>…</div>;
@@ -134,6 +159,7 @@ function Shell({ info, setInfo, setLang }: { info: AppInfo | null; setInfo: (i: 
           </main>
         </div>
       )}
+      {guide && <Guide onClose={() => setGuide(false)} />}
     </AppContext.Provider>
   );
 }
@@ -164,10 +190,10 @@ function Sidebar() {
   });
   return (
     <nav className="sidebar" aria-label="main">
-      <div className="brand"><div className="brand-mark" aria-hidden>J</div><span>{t("app.name")}</span></div>
+      <div className="brand"><BrandMark /><span>{t("app.name")}</span></div>
       <div className="nav">
         {items.map((i) => (
-          <button key={i.page} aria-label={i.label} aria-current={app.page === i.page ? "page" : undefined} onClick={() => app.go(i.page)} title={`${i.label} (⌘/Ctrl+${i.key})`}>
+          <button key={i.page} data-tour={`nav-${i.page}`} aria-label={i.label} aria-current={app.page === i.page ? "page" : undefined} onClick={() => app.go(i.page)} title={`${i.label} (⌘/Ctrl+${i.key})`}>
             <i.icon className="nav-icon" />
             <span className="label-text">{i.label}</span>
           </button>
@@ -183,6 +209,10 @@ function Sidebar() {
         ) : null}
       </div>
       <div className="nav">
+        <button data-tour="help" aria-label={t("guide.open")} onClick={() => app.openGuide()} title={t("guide.open")}>
+          <Icon.question className="nav-icon" />
+          <span className="label-text">{t("guide.open")}</span>
+        </button>
         <button aria-label={t("nav.settings")} aria-current={app.page === "settings" ? "page" : undefined} onClick={() => app.go("settings")} title={`${t("nav.settings")} (⌘/Ctrl+,)`}>
           <Icon.gear className="nav-icon" />
           <span className="label-text">{t("nav.settings")}</span>
@@ -196,7 +226,7 @@ function Sidebar() {
           ))}
           <option value="__new">+ {t("nav.addCandidate")}</option>
         </select>
-        {app.candidate?.isDemo && <DemoBadge />}
+        {app.candidate?.isDemo && <span style={{ alignSelf: "flex-start" }}><DemoBadge /></span>}
       </div>
     </nav>
   );

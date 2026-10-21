@@ -26,7 +26,7 @@ export interface RunDeps {
   fetcher?: Fetcher;
   now?: () => Date;
   signal?: AbortSignal;
-  onProgress?: (p: { runId: string; sourceId?: string; status?: SourceAttemptStatus; stats: RunStats; phase: string }) => void;
+  onProgress?: (p: { runId: string; sourceId?: string; status?: SourceAttemptStatus; items?: number; stats: RunStats; phase: string; sources?: Array<{ id: string; label: string; enabled: boolean }> }) => void;
   pauseMs?: number;
   sourceIds?: string[];
 }
@@ -151,9 +151,12 @@ export async function runSearch(repo: Repo, trigger: RunTrigger, deps: RunDeps =
   const touched = new Set<string>();
   const newOrChanged = new Set<string>();
   let cancelled = false;
-  const progress = (phase: string, sourceId?: string, status?: SourceAttemptStatus) => {
+  const progress = (phase: string, sourceId?: string, status?: SourceAttemptStatus, items?: number) => {
     repo.heartbeat(runId, stats);
-    deps.onProgress?.({ runId, sourceId, status, stats: { ...stats }, phase });
+    deps.onProgress?.({
+      runId, sourceId, status, items, stats: { ...stats }, phase,
+      sources: phase === "start" ? repo.listSources().map((x) => ({ id: x.id, label: x.label, enabled: x.enabled })) : undefined,
+    });
   };
   try {
     const sources = repo.listSources().filter((s) => !deps.sourceIds || deps.sourceIds.includes(s.id));
@@ -222,7 +225,7 @@ export async function runSearch(repo: Repo, trigger: RunTrigger, deps: RunDeps =
         repo.markSourceResult(s.id, status, at, res.partialError, status === "success" || res.items.length > 0);
         if (status === "partial") stats.sourcesFailed++;
         else stats.sourcesSucceeded++;
-        progress("source", s.id, status);
+        progress("source", s.id, status, res.items.length);
       } catch (e) {
         const st = attemptStatusFromError(e);
         repo.finishAttempt(attemptId, { status: st.status, httpStatus: st.httpStatus, error: st.message });

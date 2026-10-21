@@ -112,7 +112,7 @@ export function assess(input: AssessInput): Omit<Assessment, "id" | "createdAt" 
   const best = matches[0] ?? null;
   if (!enabledTracks.length) dims.push(dim("role", L.role, "na", "unset", msg("Направления не заданы — показываются все объявления", "No tracks set — all postings are shown")));
   else if (best) {
-    const hits = [...best.titleHits, ...best.bodyHits].slice(0, 5).join(", ");
+    const hits = [...new Set([...best.titleHits, ...best.bodyHits].map((h) => h.toLowerCase()))].slice(0, 5).join(", ");
     dims.push(dim("role", L.role, "pass", "hard", msg(`Трек «${best.track.name}»: ${hits}`, `Track "${best.track.name}": ${hits}`)));
   } else dims.push(dim("role", L.role, "fail", "hard", msg("Не совпадает ни с одним включённым направлением", "Does not match any enabled track")));
 

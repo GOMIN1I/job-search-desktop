@@ -2,7 +2,7 @@
 // Node, файловая система и ключи renderer недоступны.
 import { contextBridge, ipcRenderer } from "electron";
 
-const EVENTS = new Set(["run-progress", "run-finished", "data-changed", "notification", "navigate"]);
+const EVENTS = new Set(["run-progress", "run-finished", "data-changed", "notification", "navigate", "models-progress"]);
 
 contextBridge.exposeInMainWorld("jsd", {
   call: (method: string, args?: unknown) => ipcRenderer.invoke("api", { method, args }),

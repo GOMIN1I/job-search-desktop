@@ -21,3 +21,9 @@ playwright/.auth/
 # Локальные несинхронизируемые с iCloud рабочие папки (см. docs/BUILD.md)
 *.nosync
 *.nosync/
+.claude/
+# Ролик: зависимости и промежуточные файлы (готовые mp4 лежат в site/media)
+film/node_modules/
+film/renders/
+film/audio/mix.wav
+film/renders-log.txt

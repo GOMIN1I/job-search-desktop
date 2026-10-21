@@ -32,38 +32,74 @@ async function setSize(app, w, h) {
   await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setSize(w, h), [w, h]);
   await new Promise((r) => setTimeout(r, 350));
 }
+const L = (ru, en) => (lang === "ru" ? ru : en);
 const shot = async (win, name) => win.screenshot({ path: path.join(shots, `${lang}-${name}.png`) });
 const tag = process.env.E2E_EXECUTABLE ? "packaged" : "source";
 
 const { app, win, errors } = await launch();
 try {
   await setSize(app, 1280, 820);
-  // Онбординг: язык
+  // Первый запуск (новый сценарий из 6 шагов): язык → знакомство → о вас → что ищете → где искать → помощник → первый поиск
   await win.getByRole("combobox", { name: /Язык интерфейса|Interface language/ }).selectOption(lang);
-  await win.waitForTimeout(300);
+  await win.waitForTimeout(1600);
   await shot(win, "01-welcome");
-  check("onboarding welcome visible", await win.getByText(lang === "ru" ? "Начать настройку" : "Start setup").isVisible());
-
-  // Полный онбординг синтетического кандидата
-  await win.getByRole("button", { name: lang === "ru" ? "Начать настройку" : "Start setup" }).click();
-  await win.getByLabel(lang === "ru" ? "Имя или псевдоним (видно только вам)" : "Name or nickname (visible only to you)").fill(lang === "ru" ? "Тестовый кандидат" : "Test candidate");
-  await win.getByRole("button", { name: lang === "ru" ? "Далее" : "Next" }).click();
-  await win.getByText(lang === "ru" ? "Разметка данных / annotation" : "Data annotation").click();
-  await win.getByText(lang === "ru" ? "Поддержка в чате и email" : "Chat & email support").click();
-  await shot(win, "02-onboarding-goals");
-  await win.getByRole("button", { name: lang === "ru" ? "Далее" : "Next" }).click(); // experience
-  await win.getByLabel(lang === "ru" ? "Навык" : "Skill").fill("Excel");
-  await win.getByRole("button", { name: lang === "ru" ? "Добавить" : "Add" }).click();
-  await win.getByRole("button", { name: lang === "ru" ? "Далее" : "Next" }).click(); // place
-  await win.getByLabel(lang === "ru" ? "Фактическая страна проживания" : "Actual country of residence").selectOption("KZ");
-  await win.getByRole("group", { name: lang === "ru" ? "Требовать подтверждение найма из моей страны" : "Require confirmation of hiring from my country" }).getByRole("button", { name: lang === "ru" ? "Обязательно" : "Required" }).click();
-  await shot(win, "03-onboarding-place");
-  for (let i = 0; i < 6; i++) await win.getByRole("button", { name: lang === "ru" ? "Далее" : "Next" }).click();
-  await shot(win, "04-onboarding-review");
-  await win.getByRole("button", { name: lang === "ru" ? "Создать профиль" : "Create profile" }).click();
-  await win.getByRole("heading", { name: lang === "ru" ? "Сегодня" : "Today" }).waitFor();
-  await shot(win, "05-today-empty");
-  check("today shows empty-state text", await win.getByText(lang === "ru" ? "Вакансий в базе пока нет" : "No jobs in the database yet", { exact: false }).isVisible());
+  check("onboarding welcome visible", await win.getByRole("button", { name: L("Начать настройку", "Start setup") }).isVisible());
+  await win.getByRole("button", { name: L("Начать настройку", "Start setup") }).click();
+  check("next disabled without a name", await win.getByRole("button", { name: L("Дальше", "Next"), exact: true }).isDisabled());
+  await win.getByLabel(L("Как к вам обращаться", "What should we call you")).fill(L("Тестовый кандидат", "Test candidate"));
+  await win.getByLabel(L("В какой стране вы живёте", "Which country do you live in")).selectOption("KZ");
+  await win.getByLabel(L("Навык", "Skill")).fill("Excel");
+  await win.getByLabel(L("Пример / доказательство", "Example / evidence")).fill(L("учебный отчёт", "course report"));
+  await win.getByLabel(L("Есть пример", "Have an example")).check();
+  await win.getByRole("button", { name: L("Добавить", "Add"), exact: true }).click();
+  await shot(win, "02-onboarding-about");
+  await win.getByRole("button", { name: L("Дальше", "Next"), exact: true }).click();
+  // Возврат назад сохраняет заполненное
+  await win.getByRole("button", { name: L("Назад", "Back"), exact: true }).click();
+  check("back keeps entered name", (await win.getByLabel(L("Как к вам обращаться", "What should we call you")).inputValue()).length > 0);
+  await win.getByRole("button", { name: L("Дальше", "Next"), exact: true }).click();
+  await win.getByText(L("Разметка данных / annotation", "Data annotation")).click();
+  await win.getByText(L("Поддержка в чате и email", "Chat & email support")).click();
+  await win.getByLabel(L("Минимальная оплата в месяц", "Minimum pay per month"), { exact: true }).fill("600");
+  await win.getByLabel(L("Валюта", "Currency"), { exact: true }).selectOption("USD");
+  await win.getByLabel(L("Без обязательных звонков по телефону", "No mandatory phone calls")).check();
+  await shot(win, "03-onboarding-wishes");
+  await win.getByRole("button", { name: L("Сохранить и продолжить", "Save and continue") }).click();
+  await win.getByRole("heading", { name: L("Где искать вакансии", "Where to look for jobs") }).waitFor();
+  await shot(win, "04-onboarding-sources");
+  await win.getByRole("button", { name: L("Дальше", "Next"), exact: true }).click();
+  await win.getByRole("heading", { name: L("Помощник для разбора вакансий", "An assistant to read job postings") }).waitFor();
+  await win.waitForTimeout(2500);
+  await shot(win, "05-onboarding-assistant");
+  check("assistant step shows two models", (await win.locator(".model").count()) === 2);
+  // Если на машине уже есть Ollama с моделью — реально включаем её: приложение проверяет ответ на нашей задаче.
+  const useBtn = win.locator(".model").first().getByRole("button", { name: L("Использовать", "Use"), exact: true });
+  if (await useBtn.count()) {
+    await useBtn.click();
+    await win.locator(".model").first().getByText(L("Используется", "In use")).waitFor({ timeout: 120000 });
+    check("local model verified and switched on", true);
+    await shot(win, "05b-onboarding-assistant-in-use");
+  }
+  await win.getByRole("button", { name: L("Пропустить шаг", "Skip this step") }).click();
+  await win.getByRole("heading", { name: L("Первый поиск", "First search") }).waitFor();
+  await shot(win, "06-onboarding-search");
+  await win.getByRole("button", { name: L("Искать позже", "Search later") }).click();
+  // После настройки сразу открывается объяснение
+  await win.getByRole("dialog").waitFor();
+  await shot(win, "07-guide");
+  check("guide opens after onboarding", await win.getByRole("dialog").isVisible());
+  await win.getByRole("button", { name: L("Показать на экране", "Show me on screen") }).click();
+  await win.waitForTimeout(700);
+  await shot(win, "08-tour");
+  check("tour highlights the search button", await win.locator(".tour-ring").isVisible());
+  for (let i = 0; i < 5; i++) {
+    await win.locator(".tour-pop .btn-primary").click();
+    await win.waitForTimeout(250);
+  }
+  check("tour closes after last step", (await win.locator(".tour-pop").count()) === 0);
+  await win.getByRole("heading", { name: L("Сегодня", "Today") }).waitFor();
+  await shot(win, "09-today-empty");
+  check("today shows search panel", await win.locator(".run-panel").isVisible());
 
   // Демо-данные (синтетика) и переключатель кандидата
   await win.locator("nav.sidebar").getByRole("button", { name: lang === "ru" ? "Настройки" : "Settings", exact: true }).click();
@@ -76,7 +112,7 @@ try {
   await sel.selectOption("cand-demo");
   await win.locator("nav.sidebar").getByRole("button", { name: lang === "ru" ? "Сегодня" : "Today", exact: true }).click();
   await win.waitForTimeout(800);
-  await shot(win, "06-today-demo");
+  await shot(win, "10-today-demo");
 
   // Подборка: фильтр, поиск, карточка
   await win.locator("nav.sidebar").getByRole("button", { name: lang === "ru" ? "Вакансии" : "Jobs", exact: true }).click();
@@ -97,7 +133,7 @@ try {
   await win.waitForTimeout(300);
   await win.locator(".list-item").first().click();
   await win.waitForTimeout(500);
-  await shot(win, "07-vacancy-detail");
+  await shot(win, "11-vacancy-detail");
   check("detail shows assessment rows", (await win.locator(".dim-row").count()) >= 8);
   // клавиатура: стрелка вниз меняет выбор
   const before = await win.locator('.list-item[aria-selected="true"] .title').textContent();
@@ -112,9 +148,9 @@ try {
   check("save sets stage badge", await win.locator(".detail .badge", { hasText: lang === "ru" ? "Сохранено" : "Saved" }).first().isVisible());
   await win.getByRole("button", { name: lang === "ru" ? "Готовлю отклик" : "Preparing application" }).click();
   await win.waitForTimeout(800);
-  await shot(win, "08-application-detail");
+  await shot(win, "12-application-detail");
   check("application modal opened", await win.getByRole("dialog").isVisible());
-  await win.getByRole("dialog").getByRole("button", { name: new RegExp(lang === "ru" ? "Письмо для вакансии · шаблон" : "Letter for a job · template") }).click();
+  await win.getByRole("dialog").getByRole("button", { name: new RegExp(lang === "ru" ? "Письмо для вакансии, шаблон" : "Letter for a job, template") }).click();
   await win.waitForTimeout(800);
   check("template letter attached", (await win.getByRole("dialog").locator(".order-item").count()) >= 1);
   await win.getByRole("dialog").getByRole("button", { name: lang === "ru" ? "Отметить: отправлено вручную" : "Mark: applied manually" }).click();
@@ -122,13 +158,13 @@ try {
   await win.waitForTimeout(600);
   await win.keyboard.press("Escape");
   await win.waitForTimeout(400);
-  await shot(win, "09-applications-board");
+  await shot(win, "13-applications-board");
   check("board shows submitted column card", (await win.locator(".app-card").count()) >= 1);
 
   // Профиль
   await win.locator("nav.sidebar").getByRole("button", { name: lang === "ru" ? "Профиль" : "Profile", exact: true }).click();
   await win.waitForTimeout(600);
-  await shot(win, "10-profile");
+  await shot(win, "14-profile");
   await win.getByRole("button", { name: lang === "ru" ? "Черновик резюме из фактов" : "CV draft from facts" }).click();
   await win.waitForTimeout(600);
   check("CV draft created", (await win.getByText(lang === "ru" ? "Резюме (черновик)" : "CV (draft)").count()) >= 1);
@@ -138,7 +174,7 @@ try {
   for (const tab of lang === "ru" ? ["Поиск и расписание", "Источники", "AI", "Приватность", "Журнал"] : ["Search & schedule", "Sources", "AI", "Privacy", "Log"]) {
     await win.getByRole("tab", { name: tab }).click();
     await win.waitForTimeout(400);
-    await shot(win, `11-settings-${tab.replace(/[^a-zA-Zа-яА-Я]+/g, "-").toLowerCase()}`);
+    await shot(win, `15-settings-${tab.replace(/[^a-zA-Zа-яА-Я]+/g, "-").toLowerCase()}`);
   }
   await win.getByRole("tab", { name: lang === "ru" ? "Поиск и расписание" : "Search & schedule" }).click();
   await win.getByLabel(lang === "ru" ? "Регулярный поиск" : "Regular search").click();
@@ -150,7 +186,7 @@ try {
     await setSize(app, w, h);
     await win.locator("nav.sidebar").getByRole("button", { name: lang === "ru" ? "Вакансии" : "Jobs", exact: true }).click();
     await win.waitForTimeout(500);
-    await shot(win, `12-vacancies-${n}`);
+    await shot(win, `16-vacancies-${n}`);
   }
   const overflow = await win.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2);
   check("no horizontal page overflow at large size", !overflow);
@@ -158,10 +194,10 @@ try {
   await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = "dark"; });
   await setSize(app, 1280, 820);
   await win.waitForTimeout(500);
-  await shot(win, "13-vacancies-dark");
+  await shot(win, "17-vacancies-dark");
   await win.locator("nav.sidebar").getByRole("button", { name: lang === "ru" ? "Сегодня" : "Today", exact: true }).click();
   await win.waitForTimeout(500);
-  await shot(win, "14-today-dark");
+  await shot(win, "18-today-dark");
   await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = "system"; });
   check("no renderer errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 } catch (e) {

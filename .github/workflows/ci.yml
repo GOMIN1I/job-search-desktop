@@ -56,14 +56,19 @@ jobs:
         if: matrix.target == 'win'
         run: npx electron-builder --win --x64 --publish never
 
-      - name: E2E on Windows (packaged app)
+      - name: E2E and performance on Windows (packaged app)
         if: matrix.target == 'win'
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path release/win-unpacked -Filter "*.exe" | Select-Object -First 1
+          $exe = Get-ChildItem -Path release/win-unpacked -Filter "*.exe" | Where-Object { $_.Name -notlike "Uninstall*" } | Select-Object -First 1
           $env:E2E_EXECUTABLE = $exe.FullName
           $env:E2E_LANG = "en"
           node scripts/e2e.mjs
+          node scripts/perf.mjs
+
+      - name: Performance (macOS, packaged app)
+        if: matrix.target == 'mac'
+        run: E2E_EXECUTABLE="$PWD/release/mac-arm64/Job Search Desktop.app/Contents/MacOS/Job Search Desktop" node scripts/perf.mjs
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -73,6 +78,7 @@ jobs:
             release/*.dmg
             release/*.exe
             artifacts/e2e-*.json
+            artifacts/perf-*.json
             docs/screenshots/en-*.png
           if-no-files-found: warn
           retention-days: 14

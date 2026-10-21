@@ -3,7 +3,7 @@ import type { Application, Assessment, Lifecycle, Msg, SalaryFact, Vacancy, Mate
 import { useI18n, type TKey } from "../i18n";
 import { call } from "../api";
 import { useApp } from "../state";
-import { DemoBadge, DimIcon, Empty, FitBadge, Icon, LifeBadge, Modal, SalaryText, StageBadge, useBusy, useToast } from "../components/ui";
+import { DemoBadge, DimVerdict, Empty, FitBadge, Icon, LifeBadge, Modal, SalaryText, StageBadge, useBusy, useToast } from "../components/ui";
 
 export interface ListItem {
   id: string; title: string; company: string; location: string; sourceId: string; canonicalUrl: string; publishedAt: string | null; firstSeenAt: string;
@@ -150,14 +150,14 @@ export function Vacancies() {
           {filtered.map((i) => (
             <button key={i.id} data-id={i.id} role="option" aria-selected={sel === i.id} className={`list-item ${i.stage === "archived" || i.fit === "unsuitable" ? "dim" : ""}`} onClick={() => setSel(i.id)} tabIndex={-1}>
               <div className="title">{i.title}</div>
-              <div className="meta">{i.company || "—"} · {i.location || "—"}</div>
+              <div className="meta">{i.company || "—"}, {i.location || "—"}</div>
               <div className="chips">
                 <FitBadge fit={i.fit} />
                 <LifeBadge life={i.lifecycle} />
                 {i.stage && <StageBadge stage={i.stage} />}
                 {i.postingKind !== "job_posting" && <span className="badge b-neutral">{t(`kind.${i.postingKind}` as TKey)}</span>}
                 {i.isDemo && <DemoBadge />}
-                <span className="muted small" style={{ marginLeft: "auto" }} title={t("vac.relevanceHelp")}>{i.relevance ?? "—"} · {i.sourceId}{i.sourceCount > 1 ? ` +${i.sourceCount - 1}` : ""}</span>
+                <span className="muted small" style={{ marginLeft: "auto" }} title={t("vac.relevanceHelp")}>{i.relevance ?? "—"}, {i.sourceId}{i.sourceCount > 1 ? ` +${i.sourceCount - 1}` : ""}</span>
               </div>
             </button>
           ))}
@@ -201,9 +201,20 @@ export function VacancyDetail({ vacancyId }: { vacancyId: string }) {
       <div className="detail-head">
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1>{v.title}</h1>
-          <div className="subtle" style={{ marginTop: 4 }}>{v.company || "—"} · {v.location || "—"}</div>
-          <div className="row-wrap" style={{ marginTop: 10 }}>
-            <FitBadge fit={a?.fit ?? null} />
+          <div className="subtle" style={{ marginTop: 4 }}>{v.company || "—"}, {v.location || "—"}</div>
+          <div className="verdict-line">
+            <FitBadge fit={a?.fit ?? null} large wipe />
+            {a && (
+              <span>
+                {a.fit === "suitable"
+                  ? t("vac.sum.yes")
+                  : a.fit === "needs_check"
+                    ? t("vac.sum.ask", { n: a.dimensions.filter((x) => x.constraint === "hard" && x.status === "unknown").length })
+                    : t("vac.sum.no", { reason: m(a.dimensions.find((x) => x.constraint === "hard" && x.status === "fail")?.reason) })}
+              </span>
+            )}
+          </div>
+          <div className="row-wrap" style={{ marginTop: 12 }}>
             <LifeBadge life={v.lifecycle} />
             {stage && <StageBadge stage={stage} />}
             {v.isDemo && <DemoBadge />}
@@ -240,7 +251,7 @@ export function VacancyDetail({ vacancyId }: { vacancyId: string }) {
 
       {a && (
         <div className="next-step" role="note">
-          <Icon.clock className="nav-icon" />
+          <Icon.send className="nav-icon" />
           <div><strong>{t("vac.nextStep")}:</strong> {m(a.nextStep)}</div>
         </div>
       )}
@@ -252,17 +263,20 @@ export function VacancyDetail({ vacancyId }: { vacancyId: string }) {
         <div className="card"><div className="card-body dims">
           {a.dimensions.map((dm, i) => (
             <div className="dim-row" key={i}>
-              <DimIcon status={dm.status} />
               <div className="dim-label">{m(dm.label)}<div className="small muted">{t(`constraint.${dm.constraint}` as TKey)}</div></div>
               <div className="dim-reason">
-                <span className="sr-only">{t(`dim.${dm.status}` as TKey)}: </span>{m(dm.reason)}
-                {dm.howToResolve && dm.status !== "pass" && <div className="dim-how">→ {m(dm.howToResolve)}</div>}
-                {dm.evidence?.quote && <div className="dim-quote">«{dm.evidence.quote}» {factStatus(dm.evidence.status)}</div>}
+                {m(dm.reason)}
+                {dm.howToResolve && dm.status !== "pass" && <div className="dim-how">{m(dm.howToResolve)}</div>}
+                {dm.evidence?.quote && (
+                  <div className="dim-quote">
+                    <span className={`mark mark-soft ${dm.status === "fail" ? "mark-no" : dm.status === "unknown" ? "mark-ask" : ""}`}><q>{dm.evidence.quote}</q></span> {factStatus(dm.evidence.status)}
+                  </div>
+                )}
               </div>
-              <span className={`badge ${dm.status === "pass" ? "b-ok" : dm.status === "fail" ? "b-bad" : dm.status === "unknown" ? "b-warn" : "b-neutral"}`}>{t(`dim.${dm.status}` as TKey)}</span>
+              <DimVerdict status={dm.status} />
             </div>
           ))}
-          <p className="small muted" style={{ marginTop: 8 }}>{t("vac.rules", { r: a.rulesVersion, e: f.extractorVersion })} · {t("vac.profileVer", { v: a.profileVersion })} · {date(a.createdAt, true)}</p>
+          <p className="small muted" style={{ marginTop: 8 }}>{t("vac.rules", { r: a.rulesVersion, e: f.extractorVersion })}, {t("vac.profileVer", { v: a.profileVersion })}, {date(a.createdAt, true)}</p>
         </div></div>
       ) : <p className="muted">{t("fit.none")}</p>}
 
@@ -286,7 +300,7 @@ export function VacancyDetail({ vacancyId }: { vacancyId: string }) {
 
       <div className="section-title">{t("vac.description")}</div>
       <div className="desc">{v.description || "—"}</div>
-      <p className="small muted" style={{ marginTop: 6 }}>{t("vac.attribution", { s: d.sourceAttribution })} · <button className="btn-link small" onClick={() => run("open2", () => call("vacancies.openExternal", { url: v.canonicalUrl }))}>{v.canonicalUrl}</button></p>
+      <p className="small muted" style={{ marginTop: 6 }}>{t("vac.attribution", { s: d.sourceAttribution })}, <button className="btn-link small" onClick={() => run("open2", () => call("vacancies.openExternal", { url: v.canonicalUrl }))}>{v.canonicalUrl}</button></p>
 
       <div className="section-title">{t("vac.sources")}</div>
       <div className="card"><div className="card-body stack">
@@ -302,7 +316,7 @@ export function VacancyDetail({ vacancyId }: { vacancyId: string }) {
           </div>
         )}
         <div><strong className="small">{t("vac.history")}</strong>
-          <table className="table"><tbody>{d.history.map((h) => <tr key={h.id}><td className="small nowrap">{date(h.createdAt, true)}</td><td><FitBadge fit={h.fit as any} /></td><td className="small">{t("vac.profileVer", { v: h.profileVersion })} · {h.rulesVersion}</td><td className="small muted">{h.supersededAt ? "superseded" : t("prof.current")}</td></tr>)}</tbody></table>
+          <table className="table"><tbody>{d.history.map((h) => <tr key={h.id}><td className="small nowrap">{date(h.createdAt, true)}</td><td><FitBadge fit={h.fit as any} /></td><td className="small">{t("vac.profileVer", { v: h.profileVersion })}, {h.rulesVersion}</td><td className="small muted">{h.supersededAt ? "superseded" : t("prof.current")}</td></tr>)}</tbody></table>
         </div>
       </div></div>
 

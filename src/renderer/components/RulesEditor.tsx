@@ -101,7 +101,7 @@ export function RulesEditor({ rules, onChange, sections }: { rules: SearchRules;
           </div>
           {rules.tracks.length > 0 && (
             <>
-              <div className="section-title" style={{ margin: "8px 0 0" }}>{t("prof.tracks")} · {rules.tracks.length}</div>
+              <div className="section-title" style={{ margin: "8px 0 0" }}>{t("prof.tracks")}, {rules.tracks.length}</div>
               <div className="order-list">
                 {rules.tracks.map((tr, i) => (
                   <details key={tr.id} className="order-item" style={{ display: "block" }}>
@@ -258,13 +258,13 @@ export function RulesSummary({ rules }: { rules: SearchRules }) {
   return (
     <dl className="kv">
       <dt>{t("prof.tracks")}</dt><dd>{rules.tracks.filter((x) => x.enabled).map((x) => x.name).join(" → ") || "—"}</dd>
-      <dt>{t("ob.place.country")}</dt><dd>{c ? (lang === "ru" ? c.ru : c.en) : "—"}{rules.location.city ? `, ${rules.location.city}` : ""} · {rules.location.timezone} · <span className="muted">{mode(rules.countryEligibility.mode)}</span></dd>
-      <dt>{t("ob.step.format")}</dt><dd>{(["remote", "hybrid", "office"] as const).filter((k) => rules.workFormat[k]).map((k) => t(`ob.format.${k}`)).join(", ") || "—"}{rules.workFormat.hybrid && rules.workFormat.hybridCities.length ? ` (${rules.workFormat.hybridCities.join(", ")})` : ""} · <span className="muted">{mode(rules.workFormat.mode)}</span></dd>
-      <dt>{t("ob.step.pay")}</dt><dd>{rules.pay.minimums.map((m) => `${m.amountMonthly.toLocaleString()} ${m.currency}`).join(lang === "ru" ? " или " : " or ") || "—"} · <span className="muted">{mode(rules.pay.mode)}</span></dd>
-      <dt>{t("ob.step.hours")}</dt><dd>{rules.hours.earliestLocal}–{rules.hours.latestLocal}{rules.hours.maxWeeklyHours ? `, ≤ ${rules.hours.maxWeeklyHours} h/wk` : ""} · <span className="muted">{mode(rules.hours.mode)}</span></dd>
-      <dt>{t("ob.step.languages")}</dt><dd>{rules.languages.items.map((l) => `${l.lang.toUpperCase()} ${l.written ?? "—"}/${l.spoken ?? "—"}${l.basis === "self_reported" ? ` (${t("ob.lang.self").toLowerCase()})` : ""}`).join(", ") || "—"} · <span className="muted">{mode(rules.languages.mode)}</span></dd>
-      <dt>{t("vac.calls")}</dt><dd>{rules.voice.noPhoneWork ? t("ob.limits.noPhone") : "—"} · <span className="muted">{mode(rules.voice.mode)}</span></dd>
-      <dt>{t("ob.step.experience")}</dt><dd>≤ {rules.experience.maxYearsRequired} · {rules.experience.allowSenior ? "senior ok" : "no senior"} · <span className="muted">{mode(rules.experience.mode)}</span></dd>
+      <dt>{t("ob.place.country")}</dt><dd>{c ? (lang === "ru" ? c.ru : c.en) : "—"}{rules.location.city ? `, ${rules.location.city}` : ""}, {rules.location.timezone}, <span className="muted">{mode(rules.countryEligibility.mode)}</span></dd>
+      <dt>{t("ob.step.format")}</dt><dd>{(["remote", "hybrid", "office"] as const).filter((k) => rules.workFormat[k]).map((k) => t(`ob.format.${k}`)).join(", ") || "—"}{rules.workFormat.hybrid && rules.workFormat.hybridCities.length ? ` (${rules.workFormat.hybridCities.join(", ")})` : ""}, <span className="muted">{mode(rules.workFormat.mode)}</span></dd>
+      <dt>{t("ob.step.pay")}</dt><dd>{rules.pay.minimums.map((m) => `${m.amountMonthly.toLocaleString()} ${m.currency}`).join(lang === "ru" ? " или " : " or ") || "—"}, <span className="muted">{mode(rules.pay.mode)}</span></dd>
+      <dt>{t("ob.step.hours")}</dt><dd>{rules.hours.earliestLocal}–{rules.hours.latestLocal}{rules.hours.maxWeeklyHours ? `, ≤ ${rules.hours.maxWeeklyHours} h/wk` : ""}, <span className="muted">{mode(rules.hours.mode)}</span></dd>
+      <dt>{t("ob.step.languages")}</dt><dd>{rules.languages.items.map((l) => `${l.lang.toUpperCase()} ${l.written ?? "—"}/${l.spoken ?? "—"}${l.basis === "self_reported" ? ` (${t("ob.lang.self").toLowerCase()})` : ""}`).join(", ") || "—"}, <span className="muted">{mode(rules.languages.mode)}</span></dd>
+      <dt>{t("vac.calls")}</dt><dd>{rules.voice.noPhoneWork ? t("ob.limits.noPhone") : "—"}, <span className="muted">{mode(rules.voice.mode)}</span></dd>
+      <dt>{t("ob.step.experience")}</dt><dd>≤ {rules.experience.maxYearsRequired}, {rules.experience.allowSenior ? "senior ok" : "no senior"}, <span className="muted">{mode(rules.experience.mode)}</span></dd>
       <dt>{t("ob.limits.topics")}</dt><dd>{rules.excludedKeywords.join(", ") || "—"}</dd>
     </dl>
   );

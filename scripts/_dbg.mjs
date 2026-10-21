@@ -1,0 +1,11 @@
+import { _electron as electron } from "playwright-core";
+import fs from "node:fs"; import os from "node:os"; import path from "node:path";
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "jsd-dbg-"));
+const vdir = fs.mkdtempSync(path.join(os.tmpdir(), "jsd-vd-"));
+const app = await electron.launch({ args: ["."], env: { ...process.env, JSD_USER_DATA: dataDir }, recordVideo: { dir: vdir, size: { width: 1280, height: 800 } } });
+const win = await app.firstWindow();
+console.log("url", win.url());
+await new Promise(r => setTimeout(r, 4000));
+console.log("windows", app.windows().map(w => w.url()));
+console.log(await win.evaluate(() => [document.readyState, document.body.innerHTML.length, location.href]).catch(e => String(e)));
+await app.close();

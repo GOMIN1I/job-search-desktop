@@ -35,12 +35,42 @@ export function DimIcon({ status }: { status: DimensionStatus }) {
 }
 
 // ---------- Значки ----------
-export function FitBadge({ fit }: { fit: Fit | null }) {
+const VGlyph = { yes: Icon.check, ask: Icon.question, no: Icon.cross };
+
+/** Вердикт = маркер + значок + слово. wipe — маркер «проводится», когда вывод появляется. */
+export function FitBadge({ fit, large, wipe }: { fit: Fit | null; large?: boolean; wipe?: boolean }) {
   const { t } = useI18n();
-  if (!fit) return <span className="badge b-neutral">{t("fit.none")}</span>;
-  if (fit === "suitable") return <span className="badge b-ok"><Icon.check />{t("fit.suitable")}</span>;
-  if (fit === "needs_check") return <span className="badge b-warn"><Icon.question />{t("fit.needs_check")}</span>;
-  return <span className="badge b-bad"><Icon.cross />{t("fit.unsuitable")}</span>;
+  if (!fit) return <span className="verdict v-none">{t("fit.none")}</span>;
+  const k = fit === "suitable" ? "yes" : fit === "needs_check" ? "ask" : "no";
+  const G = VGlyph[k];
+  return (
+    <span className={`verdict v-${k}${large ? " verdict-lg" : ""}${wipe ? " mark-wipe" : ""}`}>
+      <G />
+      {t(`fit.${fit}` as TKey)}
+    </span>
+  );
+}
+
+export function DimVerdict({ status }: { status: DimensionStatus }) {
+  const { t } = useI18n();
+  if (status === "na") return <span className="badge b-neutral">{t("dim.na")}</span>;
+  const k = status === "pass" ? "yes" : status === "unknown" ? "ask" : "no";
+  const G = VGlyph[k];
+  return <span className={`verdict v-${k}`}><G />{t(`dim.${status}` as TKey)}</span>;
+}
+
+/** Фирменный знак: лист вакансии с маркерной полосой. */
+export function BrandMark({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden>
+      <rect x="2" y="2" width="60" height="60" rx="14" fill="#0B5D4B" />
+      <g transform="rotate(-8 32 32)">
+        <rect x="17" y="12" width="30" height="40" rx="5" fill="#fff" />
+        <rect x="13" y="26" width="38" height="12" rx="3" fill="#D8F04A" />
+        <path d="M21 32 l4 4 l8 -8" fill="none" stroke="#0B5D4B" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
 }
 
 export function LifeBadge({ life }: { life: Lifecycle }) {
@@ -54,6 +84,10 @@ export function StageBadge({ stage }: { stage: ApplicationStage | null }) {
   if (!stage) return null;
   const cls = stage === "offer" ? "b-ok" : stage === "rejected" || stage === "archived" ? "b-neutral" : stage === "interview" || stage === "response" ? "b-info" : "b-accent";
   return <span className={`badge ${cls}`}>{t(`stage.${stage}` as TKey)}</span>;
+}
+
+export function Spinner() {
+  return <span className="spinner" aria-hidden />;
 }
 
 export function DemoBadge() {

@@ -66,15 +66,24 @@ describe("AI-сервис", () => {
     const r = repo();
     r.insertVacancy(v);
     const before = JSON.stringify(r.getVacancy(v.id)!.facts);
-    const ai = new AiService(r, () => settings(), () => new TestTransport("test-model", [{ text: "{not json", tokensIn: 10, tokensOut: 5, model: "test-model" }]));
+    const ai = new AiService(r, () => settings(), () => new TestTransport("test-model", [{ text: "{not json", tokensIn: 10, tokensOut: 5, model: "test-model" }, { text: "{still not json", tokensIn: 10, tokensOut: 5, model: "test-model" }]));
     await expect(ai.extractRequirements(v)).rejects.toMatchObject({ code: "invalid_response" });
     expect(JSON.stringify(r.getVacancy(v.id)!.facts)).toBe(before);
     expect(r.aiRecentCalls(5)[0].status).toBe("invalid");
   });
 
+  it("одна повторная попытка: второй ответ валиден — результат принят", async () => {
+    const r = repo();
+    const t = new TestTransport("test-model", [{ text: "oops", tokensIn: 1, tokensOut: 1, model: "test-model" }, { text: JSON.stringify(good), tokensIn: 1, tokensOut: 1, model: "test-model" }]);
+    const ai = new AiService(r, () => settings(), () => t);
+    const res = await ai.extractRequirements(v);
+    expect(res.result.seniority).toBe("junior");
+    expect(t.calls.length).toBe(2);
+  });
+
   it("ответ не по схеме — invalid_response", async () => {
     const r = repo();
-    const ai = new AiService(r, () => settings(), () => new TestTransport("test-model", [{ text: JSON.stringify({ ...good, seniority: "god-tier" }), tokensIn: 1, tokensOut: 1, model: "test-model" }]));
+    const ai = new AiService(r, () => settings(), () => new TestTransport("test-model", [{ text: JSON.stringify({ ...good, seniority: "god-tier" }), tokensIn: 1, tokensOut: 1, model: "test-model" }, { text: JSON.stringify({ ...good, seniority: "god-tier" }), tokensIn: 1, tokensOut: 1, model: "test-model" }]));
     await expect(ai.extractRequirements(v)).rejects.toMatchObject({ code: "invalid_response" });
   });
 
@@ -110,7 +119,8 @@ describe("AI-сервис", () => {
   it("письмо со ссылкой на несуществующий факт отклоняется", async () => {
     const r = repo();
     const skills = [{ id: "s1", candidateId: "c", skill: "Excel", kind: "proven" as const, evidence: "отчёт", url: null, createdAt: "", updatedAt: "" }];
-    const t = new TestTransport("test-model", [{ text: JSON.stringify({ letter: "Здравствуйте! ".repeat(10), used_fact_ids: ["s1", "invented"], gaps: [] }), tokensIn: 1, tokensOut: 1, model: "test-model" }]);
+    const bad = { text: JSON.stringify({ letter: "Здравствуйте! ".repeat(10), used_fact_ids: ["s1", "invented"], gaps: [] }), tokensIn: 1, tokensOut: 1, model: "test-model" };
+    const t = new TestTransport("test-model", [bad, { ...bad }]);
     const ai = new AiService(r, () => settings(), () => t);
     await expect(ai.draftLetter({ vacancy: v, skills, lang: "ru", candidateName: "X", profileVersion: 1, candidateId: "c" })).rejects.toMatchObject({ code: "invalid_response" });
   });

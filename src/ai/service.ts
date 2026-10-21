@@ -83,22 +83,29 @@ export class AiService {
     }
     this.guardBudget(t.model, opts.system.length + opts.user.length, opts.maxTokens);
     const base = { purpose: opts.purpose, provider: t.provider, model: t.model, promptVersion: opts.promptVersion, inputHash, vacancyId: opts.vacancyId, candidateId: opts.candidateId };
-    let res;
-    try {
-      res = await t.complete({ system: opts.system, user: opts.user, schema: opts.schema, maxTokens: opts.maxTokens, signal: opts.signal });
-    } catch (e) {
-      const err = e instanceof AiError ? e : new AiError("network", msg(String((e as Error).message), String((e as Error).message)));
-      this.repo.aiRecord({ ...base, status: "error", error: `${err.code}: ${err.userMessage.en}` });
-      throw err;
-    }
-    const cost = estimateCost(this.settings().pricing, t.model, res.tokensIn, res.tokensOut);
-    let parsed: T;
-    try {
-      parsed = opts.parse(parseJson(res.text));
-    } catch (e) {
-      const err = e instanceof AiError ? e : new AiError("invalid_response", msg("Ответ не соответствует схеме — данные не изменены", "The response does not match the schema — no data changed"));
-      this.repo.aiRecord({ ...base, status: "invalid", tokensIn: res.tokensIn, tokensOut: res.tokensOut, costUsd: cost, error: String((e as Error).message).slice(0, 500) });
-      throw err;
+    // Небольшие локальные модели иногда возвращают невалидный JSON: одна повторная попытка, затем честная ошибка.
+    const attempts = t.provider === "openai_compatible" || t.provider === "test" ? 2 : 1;
+    let res!: Awaited<ReturnType<AiTransport["complete"]>>;
+    let parsed!: T;
+    let cost = 0;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        res = await t.complete({ system: opts.system, user: opts.user, schema: opts.schema, maxTokens: opts.maxTokens, signal: opts.signal });
+      } catch (e) {
+        const err = e instanceof AiError ? e : new AiError("network", msg(String((e as Error).message), String((e as Error).message)));
+        this.repo.aiRecord({ ...base, status: "error", error: `${err.code}: ${err.userMessage.en}` });
+        throw err;
+      }
+      const c = estimateCost(this.settings().pricing, t.model, res.tokensIn, res.tokensOut);
+      cost += c;
+      try {
+        parsed = opts.parse(parseJson(res.text));
+        break;
+      } catch (e) {
+        const err = e instanceof AiError ? e : new AiError("invalid_response", msg("Ответ не соответствует схеме — данные не изменены", "The response does not match the schema — no data changed"));
+        this.repo.aiRecord({ ...base, status: "invalid", tokensIn: res.tokensIn, tokensOut: res.tokensOut, costUsd: c, error: String((e as Error).message).slice(0, 500) });
+        if (attempt === attempts || err.code !== "invalid_response") throw err;
+      }
     }
     this.repo.aiRecord({ ...base, model: res.model || t.model, status: "ok", tokensIn: res.tokensIn, tokensOut: res.tokensOut, costUsd: cost, response: parsed });
     return { result: parsed, cached: false, model: res.model || t.model, promptVersion: opts.promptVersion, costUsd: cost, dropped: [] };

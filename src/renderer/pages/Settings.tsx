@@ -4,6 +4,7 @@ import { useI18n, type TKey } from "../i18n";
 import { call } from "../api";
 import { useApp } from "../state";
 import { Modal, useBusy, useToast } from "../components/ui";
+import { LocalModels } from "../components/LocalModels";
 
 type Tab = "search" | "sources" | "ai" | "data" | "privacy" | "log";
 
@@ -162,7 +163,14 @@ function AiTab() {
   const presets = form.provider === "anthropic" ? ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"] : form.provider === "openai_compatible" ? ["gemma4:e4b", "gemma4:e2b", "gpt-5-mini", "llama3.2"] : [];
   return (
     <div className="stack-lg">
-      <div className="banner banner-info">{t("set.ai.help")}</div>
+      <section className="card"><div className="card-body stack-lg">
+        <h2>{t("ob2.ai.h")}</h2>
+        <LocalModels />
+      </div></section>
+      <details className="more">
+        <summary>{t("ai.cloud.title")}</summary>
+        <div className="stack-lg">
+      <div className="banner banner-info">{t("set.ai.help")} {t("ai.cloud.privacy")}</div>
       <div className="card"><div className="card-body stack">
         <div className="field"><label htmlFor="prov">{t("set.ai.provider")}</label>
           <select id="prov" className="select" value={form.provider} onChange={(e) => {
@@ -204,10 +212,13 @@ function AiTab() {
           </div>
           <div className="row-wrap">
             <button className="btn" disabled={busy === "test"} onClick={() => run("test", async () => { const r = await call<{ ok: boolean; message: Msg }>("ai.test"); push(m(r.message), !r.ok); })}>{busy === "test" ? "…" : t("set.ai.test")}</button>
-            {s.lastTest && <span className={`badge ${s.lastTest.ok ? "b-ok" : "b-bad"}`}>{t("set.ai.lastTest")}: {date(s.lastTest.at, true)} · {m(s.lastTest.message)}</span>}
+            {s.lastTest && <span className={`badge ${s.lastTest.ok ? "b-ok" : "b-bad"}`}>{t("set.ai.lastTest")}: {date(s.lastTest.at, true)}, {m(s.lastTest.message)}</span>}
           </div>
         </div></div>
       )}
+
+        </div>
+      </details>
 
       <div className="card"><div className="card-header"><h2>{t("set.ai.recent")}</h2><span className="muted small">{t("set.ai.usage", { usd: d.usage.usd.toFixed(4), n: d.usage.calls })}</span></div><div className="card-body" style={{ overflowX: "auto" }}>
         {d.recent.length ? <table className="table"><thead><tr><th></th><th>purpose</th><th>model</th><th>status</th><th>tokens</th><th>$</th></tr></thead><tbody>{d.recent.map((r, i) => <tr key={i}><td className="small nowrap">{date(r.created_at, true)}</td><td className="small">{r.purpose}<div className="muted">{r.prompt_version}</div></td><td className="small">{r.provider} / {r.model}</td><td><span className={`badge ${r.status === "ok" ? "b-ok" : "b-bad"}`}>{r.status}</span>{r.error && <div className="small muted" style={{ maxWidth: 260 }}>{r.error}</div>}</td><td className="small">{r.tokens_in}/{r.tokens_out}</td><td className="small">{Number(r.cost_usd).toFixed(4)}</td></tr>)}</tbody></table> : <p className="muted">—</p>}

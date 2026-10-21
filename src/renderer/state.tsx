@@ -17,7 +17,16 @@ export interface AppInfo {
 export interface RunState {
   running: boolean;
   runId: string | null;
-  progress: { phase?: string; sourceId?: string; stats?: Record<string, number> } | null;
+  progress: { phase?: string; sourceId?: string; status?: string; items?: number; stats?: Record<string, number> } | null;
+}
+
+/** Состояние «дорожки» источника во время поиска: ждёт → читает → готово/ошибка. */
+export interface Lane {
+  id: string;
+  label: string;
+  state: "wait" | "active" | "done" | "fail" | "skip";
+  status?: string;
+  items?: number;
 }
 
 export interface AppCtx {
@@ -31,6 +40,8 @@ export interface AppCtx {
   focusApplication: string | null;
   version: number; // увеличивается при изменении данных → страницы перезагружают данные
   run: RunState;
+  lanes: Lane[];
+  openGuide: () => void;
   startRun: () => Promise<void>;
   cancelRun: () => Promise<void>;
   reload: () => Promise<void>;

@@ -1,0 +1,19 @@
+{
+  "name": "job-search-desktop-film",
+  "private": true,
+  "description": "Промо-ролик Job Search Desktop: Remotion (картинка) + numpy (музыка) + ffmpeg (мастер)",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "bash make_film.sh"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.536",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.536"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "typescript": "5.9.3"
+  }
+}

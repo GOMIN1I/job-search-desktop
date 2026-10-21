@@ -50,7 +50,7 @@ export function Profile() {
           <div className="card-body">
             <RulesSummary rules={p.profile.rules} />
             <details style={{ marginTop: 12 }}>
-              <summary className="small subtle" style={{ cursor: "pointer" }}>{t("prof.versions")} · {p.history.length}</summary>
+              <summary className="small subtle" style={{ cursor: "pointer" }}>{t("prof.versions")}, {p.history.length}</summary>
               <table className="table"><tbody>{p.history.map((h) => <tr key={h.version}><td>v{h.version}{h.version === p.profile.version ? ` · ${t("prof.current")}` : ""}</td><td className="small">{date(h.createdAt, true)}</td><td className="small">{h.note}</td></tr>)}</tbody></table>
             </details>
           </div>
@@ -63,7 +63,7 @@ export function Profile() {
             <div className="grid-3">
               {groups.map(([k, label, cls]) => (
                 <div key={k} className="stack">
-                  <span className={`badge ${cls}`} style={{ alignSelf: "flex-start" }}>{t(label)} · {p.skills.filter((s) => s.kind === k).length}</span>
+                  <span className={`badge ${cls}`} style={{ alignSelf: "flex-start" }}>{t(label)}, {p.skills.filter((s) => s.kind === k).length}</span>
                   {p.skills.filter((s) => s.kind === k).map((s) => (
                     <button key={s.id} className="app-card" onClick={() => setSkillEdit(s)}>
                       <strong>{s.skill}</strong>
@@ -97,7 +97,7 @@ export function Profile() {
                     <span className={`badge ${m.status === "human_reviewed" ? "b-ok" : m.status === "stale" ? "b-warn" : "b-neutral"}`}>{t(`prof.status.${m.status}` as TKey)}</span>
                     <span className="badge b-outline">{t(`prof.origin.${m.origin}` as TKey)}</span>
                     {m.filePath ? <span className={`badge ${m.fileAvailable ? "b-ok" : "b-bad"}`}>{m.fileAvailable ? t("prof.fileOk") : t("prof.fileMissing")}</span> : m.origin === "imported" ? <span className="badge b-warn">{t("prof.noFile")}</span> : null}
-                    {m.aiModel && <span className="small muted">{m.aiModel} · {m.promptVersion}</span>}
+                    {m.aiModel && <span className="small muted">{m.aiModel}, {m.promptVersion}</span>}
                     {m.usedFacts.length > 0 && <span className="small muted">{t("prof.usedFacts", { n: m.usedFacts.length })}</span>}
                     <span className="small muted">{date(m.updatedAt)}</span>
                     <span style={{ flex: 1 }} />

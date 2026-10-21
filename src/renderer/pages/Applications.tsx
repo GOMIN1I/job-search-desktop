@@ -151,7 +151,7 @@ function ApplicationDetail({ row, onClose }: { row: AppRow; onClose: () => void 
           <div className="row-wrap">
             <select className="select" value={attach} onChange={(e) => setAttach(e.target.value)} aria-label={t("app.attach")}>
               <option value="">{t("app.attach")}…</option>
-              {forThis.map((m) => <option key={m.id} value={m.id}>{m.title} · v{m.version} · {t(`prof.status.${m.status}` as TKey)}</option>)}
+              {forThis.map((m) => <option key={m.id} value={m.id}>{m.title} · v{m.version}, {t(`prof.status.${m.status}` as TKey)}</option>)}
             </select>
             <button className="btn btn-sm" disabled={!attach} onClick={() => { void upd({ materialVersionIds: [...row.materialVersionIds, attach] }); setAttach(""); }}>{t("common.add")}</button>
             <span style={{ flex: 1 }} />
@@ -159,7 +159,7 @@ function ApplicationDetail({ row, onClose }: { row: AppRow; onClose: () => void 
               const r = await call<{ material: MaterialVersion }>("materials.createDraft", { candidateId: cid, vacancyId: row.vacancyId, kind: "letter", lang, mode: "template" });
               await call("applications.update", { id: row.id, materialVersionIds: [...row.materialVersionIds, r.material.id] });
               push(t("prof.origin.template"));
-            })}>{t("prof.newLetter")} · {t("prof.origin.template")}</button>
+            })}>{t("prof.newLetter")}, {t("prof.origin.template")}</button>
             <button className="btn btn-sm" disabled={!!busy} onClick={() => run("ai", async () => {
               const r = await call<{ material: MaterialVersion; costUsd: number }>("materials.createDraft", { candidateId: cid, vacancyId: row.vacancyId, kind: "letter", lang, mode: "ai" });
               await call("applications.update", { id: row.id, materialVersionIds: [...row.materialVersionIds, r.material.id] });
