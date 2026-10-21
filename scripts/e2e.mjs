@@ -251,6 +251,7 @@ try {
   }
 }
 fs.rmSync(dataDir, { recursive: true, force: true });
+fs.mkdirSync("artifacts", { recursive: true });
 fs.writeFileSync(path.join("artifacts", `e2e-${lang}-${tag}.json`), JSON.stringify({ at: new Date().toISOString(), target: tag, results }, null, 2));
 const failed = results.filter((r) => !r.ok);
 log(`${results.length - failed.length}/${results.length} passed`);
