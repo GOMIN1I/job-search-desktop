@@ -269,7 +269,7 @@ export function VacancyDetail({ vacancyId }: { vacancyId: string }) {
                 {dm.howToResolve && dm.status !== "pass" && <div className="dim-how">{m(dm.howToResolve)}</div>}
                 {dm.evidence?.quote && (
                   <div className="dim-quote">
-                    <span className={`mark mark-soft ${dm.status === "fail" ? "mark-no" : dm.status === "unknown" ? "mark-ask" : ""}`}><q>{dm.evidence.quote}</q></span> {factStatus(dm.evidence.status)}
+                    <span className={`mark mark-soft ${dm.status === "fail" ? "mark-no" : dm.status === "unknown" ? "mark-ask" : ""}`}><q>{quoteText(dm.evidence.quote, t)}</q></span> {factStatus(dm.evidence.status)}
                   </div>
                 )}
               </div>
@@ -283,9 +283,9 @@ export function VacancyDetail({ vacancyId }: { vacancyId: string }) {
       <div className="section-title">{t("vac.facts")}</div>
       <div className="card"><div className="card-body">
         <dl className="kv">
-          <dt>{t("vac.salary")}</dt><dd><SalaryText s={f.salary} />{f.salary.guaranteedHoursPerWeek ? <span className="small muted"> · {f.salary.guaranteedHoursPerWeek} h/wk</span> : null}{f.salary.quote && <div className="dim-quote">«{f.salary.quote}»</div>}</dd>
+          <dt>{t("vac.salary")}</dt><dd><SalaryText s={f.salary} />{f.salary.guaranteedHoursPerWeek ? <span className="small muted">, {f.salary.guaranteedHoursPerWeek} h/wk</span> : null}{f.salary.quote && <div className="dim-quote">«{f.salary.quote}»</div>}</dd>
           <dt>{t("vac.format")}</dt><dd>{t(`format.${f.format.value}` as TKey)}{factStatus(f.format.status)}</dd>
-          <dt>{t("vac.location")}</dt><dd>{f.geography.value.scope === "unknown" ? <span className="muted">{t("common.unknown")}</span> : <>{f.geography.value.allowed.join(", ") || f.geography.value.scope}{f.geography.value.excluded.length ? ` · ✕ ${f.geography.value.excluded.join(", ")}` : ""}</>}{factStatus(f.geography.status)}{f.geography.quote && <div className="dim-quote">«{f.geography.quote}»</div>}</dd>
+          <dt>{t("vac.location")}</dt><dd>{f.geography.value.scope === "unknown" ? <span className="muted">{t("common.unknown")}</span> : <>{f.geography.value.allowed.join(", ") || f.geography.value.scope}{f.geography.value.excluded.length ? `, ✕ ${f.geography.value.excluded.join(", ")}` : ""}</>}{factStatus(f.geography.status)}{f.geography.quote && <div className="dim-quote">«{quoteText(f.geography.quote, t)}»</div>}</dd>
           <dt>{t("vac.schedule")}</dt><dd>{f.schedule.status === "unknown" ? <span className="muted">{t("common.unknown")}</span> : <>{f.schedule.value.start && f.schedule.value.end ? `${f.schedule.value.start}–${f.schedule.value.end} ${f.schedule.value.zone ?? ""}` : ""} {f.schedule.value.weeklyMin ? `${f.schedule.value.weeklyMin}${f.schedule.value.weeklyMax && f.schedule.value.weeklyMax !== f.schedule.value.weeklyMin ? `–${f.schedule.value.weeklyMax}` : ""} h/wk` : ""} {f.schedule.value.flexible ? "flexible" : ""}</>}{factStatus(f.schedule.status)}</dd>
           <dt>{t("vac.languages")}</dt><dd>{f.languages.value.length ? f.languages.value.map((l) => `${l.lang.toUpperCase()} ${l.level ?? "?"}${l.spoken ? " 🗣" : ""}${l.required ? "" : ` (${t("vac.preferred")})`}`).join(", ") : <span className="muted">{t("common.unknown")}</span>}{factStatus(f.languages.status)}</dd>
           <dt>{t("vac.calls")}</dt><dd>{t(`vac.calls.${f.voice.value.phoneWork}` as TKey)}{factStatus(f.voice.status)}</dd>
@@ -333,4 +333,11 @@ export function VacancyDetail({ vacancyId }: { vacancyId: string }) {
       )}
     </article>
   );
+}
+
+// Цитаты из структурированных полей источника хранятся шаблоном на русском (src/core/facts.ts) — переводим при показе
+function quoteText(q: string, t: (key: TKey, vars?: Record<string, string | number>) => string): string {
+  if (q === "Источник публикует только удалённые вакансии") return t("vac.quote.remoteSource");
+  if (q.startsWith("Локация: ")) return t("vac.quote.location", { loc: q.slice("Локация: ".length) });
+  return q;
 }
