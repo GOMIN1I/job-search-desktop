@@ -17,12 +17,20 @@ function tmpDir() {
   created.push(d);
   return d;
 }
+// Windows не даёт удалить открытый файл базы: сначала закрываем все базы теста, потом чистим папки
+const openedDbs: { close(): void }[] = [];
 afterAll(() => {
-  for (const d of created) fs.rmSync(d, { recursive: true, force: true });
+  for (const db of openedDbs) {
+    try { db.close(); } catch { /* уже закрыта */ }
+  }
+  for (const d of created) {
+    try { fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* временная папка останется — не ошибка теста */ }
+  }
 });
 
 function freshRepo(dir = tmpDir()) {
   const { db } = openDatabase(path.join(dir, "app.sqlite"));
+  openedDbs.push(db);
   const repo = new Repo(db);
   repo.seedDefaults();
   return { repo, dir, db };
@@ -260,6 +268,7 @@ describe("импорт, откат, миграции", () => {
     expect(() => openDatabase(file, { migrations: [...MIGRATIONS, { version: 2, name: "add col", sql: "ALTER TABLE candidates ADD COLUMN extra TEXT;" }, { version: 3, name: "broken", sql: "ALTER TABLE nope ADD COLUMN x TEXT;" }] })).toThrow(/Миграция 3/);
     const again = openDatabase(file, { migrations: [...MIGRATIONS, { version: 2, name: "add col", sql: "ALTER TABLE candidates ADD COLUMN extra TEXT;" }] });
     expect(again.db.prepare("SELECT value FROM meta WHERE key='schema_version'").get()).toMatchObject({ value: "2" });
+    again.db.close();
   });
 
   it("импорт профиля: создаёт кандидата, повтор не дублирует", () => {
