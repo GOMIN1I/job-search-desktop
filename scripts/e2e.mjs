@@ -203,7 +203,7 @@ try {
   await win.getByLabel(lang === "ru" ? "Регулярный поиск" : "Regular search").click();
   await win.waitForTimeout(500);
   check("schedule shows next run", await win.getByText(lang === "ru" ? "Следующий запуск" : "Next run").first().isVisible());
-  check("schedule has time zone and closed-app option", await win.getByLabel(L("Часовой пояс", "Time zone")).isVisible() && (await win.getByText(L("Искать, даже когда приложение закрыто", "Search even when the app is closed")).count()) === 1);
+  check("schedule has time zone and closed-app option", await win.getByLabel(L("Часовой пояс", "Time zone")).isVisible() && (await win.getByText(L("Искать, даже когда приложение закрыто", "Search even when the app is closed"), { exact: true }).count()) === 1);
   await win.locator("#cloud").scrollIntoViewIfNeeded();
   check("search server panel visible", await win.locator("#cloud").isVisible());
   await shot(win, "15b-settings-cloud");
