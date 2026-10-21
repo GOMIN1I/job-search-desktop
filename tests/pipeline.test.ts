@@ -2,13 +2,13 @@ import { describe, expect, it, beforeEach, afterAll } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { openDatabase, MIGRATIONS } from "../src/db/db";
+import { openDatabase, MIGRATIONS, SCHEMA_VERSION } from "../src/db/db";
 import { Repo } from "../src/db/repo";
 import { runSearch, AlreadyRunningError, assessAll } from "../src/pipeline/run";
 import { applyBackup, applyVacancyImport, exportBackup, previewVacancyImport, readVacancyFile, previewBackup, applyProfileImport, PROFILE_FORMAT } from "../src/importexport/importer";
 import { loadDemo, DEMO_CANDIDATE_ID } from "../src/demo/demo";
 import { parseHabr, parseRemoteOk, parseHimalayas, parseWwr, repairMojibake } from "../src/sources/adapters";
-import { fakeFetcher, FIX } from "./fakeSources";
+import { fakeFetcher, FIX, allDefault, ALL_DEFAULT_SOURCES } from "./fakeSources";
 import { rulesRu } from "./helpers";
 
 const created: string[] = [];
@@ -72,7 +72,8 @@ describe("поиск и база", () => {
     repo.createCandidate({ id: "c-ru", name: "Synthetic RU", rules: rulesRu() });
   });
 
-  it("частичный итог при сбое источника, политика hh.ru, дубли между источниками", async () => {
+  it("частичный итог при сбое источника, исключение, заданное пользователем, дубли между источниками", async () => {
+    repo.addExcludedHost("hh.ru", "Исключено пользователем");
     const r = await runSearch(repo, "manual", { fetcher: fakeFetcher({ workingnomads: "500", remoteok: "429" }) as any, pauseMs: 0 });
     expect(r.status).toBe("partial");
     const attempts = repo.attemptsForRun(r.runId);
@@ -81,6 +82,9 @@ describe("поиск и база", () => {
     expect(st.remoteok).toBe("blocked");
     expect(st.ats).toBe("not_configured");
     expect(st.jobicy).toBe("success");
+    expect(st.themuse).toBe("success");
+    expect(st.arbeitnow).toBe("success");
+    expect(st.hh).toBe("disabled"); // нужен доступ — по умолчанию выключен
     expect(r.stats.policyBlocked).toBe(1);
     expect(r.stats.mergedFallback).toBe(1); // Jobicy и Remotive — одна вакансия
     const list = repo.listVacanciesForCandidate("c-ru");
@@ -99,7 +103,7 @@ describe("поиск и база", () => {
     const before = repo.counts().vacancies;
     const r2 = await runSearch(repo, "manual", { fetcher: fakeFetcher({}, calls) as any, pauseMs: 0 });
     expect(calls.length).toBe(n1);
-    expect(r2.stats.sourcesNotDue).toBeGreaterThanOrEqual(7);
+    expect(r2.stats.sourcesNotDue).toBeGreaterThanOrEqual(ALL_DEFAULT_SOURCES.length);
     expect(r2.stats.newVacancies).toBe(0);
     expect(repo.counts().vacancies).toBe(before);
   });
@@ -142,15 +146,15 @@ describe("поиск и база", () => {
   });
 
   it("offline: прогон failed, уведомление о сбое, а не «0 вакансий»", async () => {
-    const r = await runSearch(repo, "manual", { fetcher: fakeFetcher({ jobicy: "throw", remotive: "throw", himalayas: "throw", remoteok: "throw", workingnomads: "throw", weworkremotely: "throw", habrcareer: "throw" }) as any, pauseMs: 0 });
+    const r = await runSearch(repo, "manual", { fetcher: fakeFetcher(allDefault("throw")) as any, pauseMs: 0 });
     expect(r.status).toBe("failed");
-    expect(r.stats.sourcesFailed).toBe(7);
+    expect(r.stats.sourcesFailed).toBe(ALL_DEFAULT_SOURCES.length);
     expect(repo.listNotifications("c-ru").some((n) => n.kind === "run_failed")).toBe(true);
   });
 
   it("нулевые результаты при рабочих источниках — succeeded, 0 новых; пустая база не падает", async () => {
     expect(repo.listVacanciesForCandidate("c-ru")).toEqual([]);
-    const r = await runSearch(repo, "manual", { fetcher: fakeFetcher({ jobicy: "empty", remotive: "empty", himalayas: "empty", remoteok: "empty", workingnomads: "empty", weworkremotely: "empty", habrcareer: "empty" }) as any, pauseMs: 0 });
+    const r = await runSearch(repo, "manual", { fetcher: fakeFetcher(allDefault("empty")) as any, pauseMs: 0 });
     expect(r.status).toBe("succeeded");
     expect(r.stats.newVacancies).toBe(0);
   });
@@ -215,8 +219,9 @@ describe("поиск и база", () => {
 });
 
 describe("импорт, откат, миграции", () => {
-  it("импорт вакансий: предпросмотр, блокировка hh.ru, дубли, идемпотентность", () => {
+  it("импорт вакансий: предпросмотр, исключённый пользователем домен, дубли, идемпотентность", () => {
     const { repo, dir } = freshRepo();
+    repo.addExcludedHost("hh.ru", "Исключено пользователем");
     repo.createCandidate({ id: "c1", name: "A", rules: rulesRu() });
     const csv = [
       "Вакансия,Компания,Ссылка,Дата проверки,Заметки",
@@ -262,12 +267,12 @@ describe("импорт, откат, миграции", () => {
     const dir = tmpDir();
     const file = path.join(dir, "m.sqlite");
     openDatabase(file).db.close();
-    const ok = openDatabase(file, { migrations: [...MIGRATIONS, { version: 2, name: "add col", sql: "ALTER TABLE candidates ADD COLUMN extra TEXT;" }] });
+    const ok = openDatabase(file, { migrations: [...MIGRATIONS, { version: SCHEMA_VERSION + 1, name: "add col", sql: "ALTER TABLE candidates ADD COLUMN extra TEXT;" }] });
     expect(ok.backupPath && fs.existsSync(ok.backupPath)).toBeTruthy();
     ok.db.close();
-    expect(() => openDatabase(file, { migrations: [...MIGRATIONS, { version: 2, name: "add col", sql: "ALTER TABLE candidates ADD COLUMN extra TEXT;" }, { version: 3, name: "broken", sql: "ALTER TABLE nope ADD COLUMN x TEXT;" }] })).toThrow(/Миграция 3/);
-    const again = openDatabase(file, { migrations: [...MIGRATIONS, { version: 2, name: "add col", sql: "ALTER TABLE candidates ADD COLUMN extra TEXT;" }] });
-    expect(again.db.prepare("SELECT value FROM meta WHERE key='schema_version'").get()).toMatchObject({ value: "2" });
+    expect(() => openDatabase(file, { migrations: [...MIGRATIONS, { version: SCHEMA_VERSION + 1, name: "add col", sql: "ALTER TABLE candidates ADD COLUMN extra TEXT;" }, { version: SCHEMA_VERSION + 2, name: "broken", sql: "ALTER TABLE nope ADD COLUMN x TEXT;" }] })).toThrow(new RegExp(`Миграция ${SCHEMA_VERSION + 2}`));
+    const again = openDatabase(file, { migrations: [...MIGRATIONS, { version: SCHEMA_VERSION + 1, name: "add col", sql: "ALTER TABLE candidates ADD COLUMN extra TEXT;" }] });
+    expect(again.db.prepare("SELECT value FROM meta WHERE key='schema_version'").get()).toMatchObject({ value: String(SCHEMA_VERSION + 1) });
     again.db.close();
   });
 

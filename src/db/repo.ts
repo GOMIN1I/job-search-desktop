@@ -143,10 +143,14 @@ export class Repo {
           this.run("UPDATE sources SET label=?, homepage=?, coverage_note=?, terms_note=?, attribution=? WHERE id=?", d.label, d.homepage, JSON.stringify(d.coverageNote), JSON.stringify(d.termsNote), d.attribution, d.id);
           // Минимальный интервал не может быть ниже официального.
           this.run("UPDATE sources SET min_interval_minutes=? WHERE id=? AND min_interval_minutes < ?", d.minIntervalMinutes, d.id, d.minIntervalMinutes);
+          // Глубина прохода растёт вместе с адаптером (поиск по запросам, пагинация).
+          this.run("UPDATE sources SET max_pages=? WHERE id=? AND max_pages < ?", d.maxPages, d.id, d.maxPages);
         }
       }
+      // Раньше часть исключений поставлялась встроенной; теперь исключает только сам пользователь.
+      this.run("DELETE FROM excluded_hosts WHERE builtin=1");
       for (const h of DEFAULT_EXCLUDED_HOSTS) {
-        this.run("INSERT INTO excluded_hosts(host, reason, builtin) VALUES(?,?,1) ON CONFLICT(host) DO UPDATE SET builtin=1", h.host, h.reason);
+        this.run("INSERT INTO excluded_hosts(host, reason, builtin) VALUES(?,?,1) ON CONFLICT(host) DO NOTHING", h.host, h.reason);
       }
     });
   }
@@ -217,6 +221,18 @@ export class Repo {
   }
   profileHistory(candidateId: string) {
     return this.all("SELECT version, created_at, note FROM search_profiles WHERE candidate_id=? ORDER BY version DESC", candidateId).map((r) => ({ version: r.version as number, createdAt: r.created_at as string, note: r.note as string }));
+  }
+
+  // ---------- проверки свободной части инструкций (ИИ) ----------
+  saveInstructionCheck(c: { candidateId: string; vacancyId: string; notesHash: string; status: string; reason: Msg; quote: string | null }) {
+    this.run(
+      "INSERT INTO instruction_checks(candidate_id, vacancy_id, notes_hash, status, reason_json, quote, created_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(candidate_id, vacancy_id, notes_hash) DO UPDATE SET status=excluded.status, reason_json=excluded.reason_json, quote=excluded.quote, created_at=excluded.created_at",
+      c.candidateId, c.vacancyId, c.notesHash, c.status, JSON.stringify(c.reason), c.quote, nowIso(),
+    );
+  }
+  instructionCheck(candidateId: string, vacancyId: string, notesHash: string): { status: "pass" | "fail" | "unknown"; reason: Msg; quote: string | null } | null {
+    const r = this.get("SELECT status, reason_json, quote FROM instruction_checks WHERE candidate_id=? AND vacancy_id=? AND notes_hash=?", candidateId, vacancyId, notesHash);
+    return r ? { status: r.status, reason: j<Msg>(r.reason_json, { ru: "", en: "" }), quote: r.quote } : null;
   }
 
   // ---------- навыки ----------

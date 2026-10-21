@@ -1,11 +1,13 @@
 // Оркестрация поиска: попытки по источникам, нормализация, дедупликация, наблюдения, оценка всех кандидатов, уведомления.
 // Сбой источника фиксируется отдельно и не превращается в «0 вакансий»; итог прогона — partial, а не success.
 
-import type { RunStats, RunStatus, RunTrigger, SourceAttemptStatus, Vacancy } from "../shared/types";
+import type { RunStats, RunStatus, RunTrigger, SearchRules, SourceAttemptStatus, Vacancy } from "../shared/types";
+import { activeDirectives, notesHash, sourcesExcludedByEveryone } from "../core/instructions";
 import { msg } from "../shared/types";
 import type { Repo } from "../db/repo";
 import { EMPTY_STATS } from "../db/repo";
 import { SOURCE_DEFINITIONS, collect, type RawJob } from "../sources/adapters";
+import { buildQueries } from "../sources/search";
 import { HttpError, PolicyBlockedError, httpGet, type Fetcher } from "../sources/http";
 import { decideDedupe, type VacRef } from "../core/dedupe";
 import { assess, RULES_VERSION } from "../core/assess";
@@ -29,6 +31,10 @@ export interface RunDeps {
   onProgress?: (p: { runId: string; sourceId?: string; status?: SourceAttemptStatus; items?: number; stats: RunStats; phase: string; sources?: Array<{ id: string; label: string; enabled: boolean }> }) => void;
   pauseMs?: number;
   sourceIds?: string[];
+  /** Собранные записи источника (сервер поиска складывает их для приложения). */
+  onRawItems?: (sourceId: string, items: RawJob[]) => void;
+  /** Доступы к источникам (расшифровываются в главном процессе и передаются только в сбор). */
+  credentials?: { hhToken?: string | null; adzuna?: { appId: string; appKey: string } | null };
 }
 
 export interface IngestOutcome {
@@ -117,11 +123,13 @@ export function assessAll(repo: Repo, opts: { candidateIds?: string[]; vacancyId
   for (const c of candidates) {
     const profile = repo.currentProfile(c.id);
     const skills = repo.listSkills(c.id);
+    const nh = notesHash(activeDirectives(profile.rules));
     repo.transaction(() => {
       for (const v of vacancies) {
         // Демо-вакансии оцениваются только для демо-кандидатов и наоборот, чтобы не смешивать данные.
         if (v.isDemo !== c.isDemo) continue;
-        const a = assess({ rules: profile.rules, profileVersion: profile.version, skills, vacancy: v, candidateId: c.id, now: opts.now });
+        const instructionNote = nh ? repo.instructionCheck(c.id, v.id, nh) : null;
+        const a = assess({ rules: profile.rules, profileVersion: profile.version, skills, vacancy: v, candidateId: c.id, now: opts.now, instructionNote });
         const r = repo.saveAssessment(a);
         if (r.changed) changed.push({ candidateId: c.id, vacancyId: v.id, fit: a.fit, previousFit: r.previous?.fit ?? null });
       }
@@ -133,11 +141,82 @@ export function assessAll(repo: Repo, opts: { candidateIds?: string[]; vacancyId
 function attemptStatusFromError(e: unknown): { status: SourceAttemptStatus; httpStatus: number | null; message: string } {
   const err = e as Error & { httpStatus?: number; notConfigured?: boolean };
   if (err instanceof PolicyBlockedError) return { status: "blocked", httpStatus: null, message: err.message };
-  if (err?.notConfigured) return { status: "not_configured", httpStatus: null, message: "Нет компаний для опроса / no companies configured" };
+  if (err?.notConfigured) return { status: "not_configured", httpStatus: null, message: err.message && err.message !== "not_configured" ? err.message : "Нет компаний для опроса / no companies configured" };
   const hs = err instanceof HttpError ? err.status : err?.httpStatus ?? null;
-  if (hs === 401 || hs === 403 || hs === 429) return { status: "blocked", httpStatus: hs, message: `HTTP ${hs}: доступ ограничен или лимит / access restricted or rate-limited` };
+  if (hs === 401 || hs === 403 || hs === 429) return { status: "blocked", httpStatus: hs, message: /HTTP \d{3}/.test(String(err?.message)) && err?.message.length > 12 ? err.message : `HTTP ${hs}: доступ ограничен или лимит / access restricted or rate-limited` };
   if (/Отменено|aborted/i.test(String(err?.message))) return { status: "cancelled", httpStatus: null, message: "Отменено / cancelled" };
   return { status: "failed", httpStatus: hs, message: String(err?.message || err) };
+}
+
+/** Что искать: фразы направлений и страны всех настоящих профилей (демо — только если других нет). */
+export function searchPlan(repo: Repo): { queries: string[]; countries: string[]; rules: SearchRules[] } {
+  const all = repo.listCandidates();
+  const real = all.filter((c) => !c.isDemo);
+  const people = real.length ? real : all;
+  const tracks: Array<{ enabled: boolean; titleKeywords: string[] }> = [];
+  const countries = new Set<string>();
+  const rulesList: SearchRules[] = [];
+  for (const c of people) {
+    let rules;
+    try {
+      rules = repo.currentProfile(c.id).rules;
+    } catch {
+      continue;
+    }
+    rulesList.push(rules);
+    tracks.push(...rules.tracks);
+    if (rules.location.country) countries.add(rules.location.country.toUpperCase());
+  }
+  return { queries: buildQueries(tracks), countries: [...countries], rules: rulesList };
+}
+
+/** Уведомления только о новых/изменившихся подходящих или требующих уточнения, без повторов. */
+function notifyMatches(repo: Repo, changed: Array<{ candidateId: string; vacancyId: string; fit: string; previousFit: string | null }>, newOrChanged: Set<string>): number {
+  let n = 0;
+  for (const ch of changed) {
+    if (!newOrChanged.has(ch.vacancyId)) continue;
+    if (ch.fit !== "suitable" && ch.fit !== "needs_check") continue;
+    const v = repo.getVacancy(ch.vacancyId);
+    const app = repo.getApplication(ch.candidateId, ch.vacancyId);
+    if (!v || app?.stage === "archived") continue;
+    const ok = repo.addNotification({
+      candidateId: ch.candidateId,
+      kind: ch.previousFit ? "changed_match" : "new_match",
+      dedupeKey: `${ch.candidateId}:${ch.vacancyId}:${ch.fit}:${v.contentHash}`,
+      title: ch.fit === "suitable" ? msg("Подходящая вакансия", "Matching job") : msg("Вакансия требует уточнения", "Job needs clarification"),
+      body: msg(`${v.title} — ${v.company}`, `${v.title} — ${v.company}`),
+      vacancyId: v.id,
+    });
+    if (ok) n++;
+  }
+  return n;
+}
+
+/** Принять записи, собранные вне этого компьютера (сервер поиска): те же дедупликация, оценка и уведомления. */
+export function importExternalItems(repo: Repo, items: Array<{ raw: RawJob; at: string }>, opts: { provenance: string; now?: Date }): { inserted: number; changed: number; notifications: number; suitable: number } {
+  const now = opts.now ?? new Date();
+  const touched = new Set<string>();
+  const newOrChanged = new Set<string>();
+  let inserted = 0;
+  let changedCount = 0;
+  repo.transaction(() => {
+    for (const it of items) {
+      const out = ingestRaw(repo, it.raw, { runId: null, now: new Date(it.at || now), provenance: opts.provenance });
+      if (!out.vacancyId) continue;
+      touched.add(out.vacancyId);
+      if (out.change === "new") {
+        inserted++;
+        newOrChanged.add(out.vacancyId);
+      } else if (out.change === "changed") {
+        changedCount++;
+        newOrChanged.add(out.vacancyId);
+      }
+    }
+  });
+  const changed = touched.size ? assessAll(repo, { vacancyIds: [...touched], now }) : [];
+  const notifications = notifyMatches(repo, changed, newOrChanged);
+  const suitable = changed.filter((c) => newOrChanged.has(c.vacancyId) && c.fit === "suitable").length;
+  return { inserted, changed: changedCount, notifications, suitable };
 }
 
 export async function runSearch(repo: Repo, trigger: RunTrigger, deps: RunDeps = {}): Promise<{ runId: string; status: RunStatus; stats: RunStats }> {
@@ -160,6 +239,8 @@ export async function runSearch(repo: Repo, trigger: RunTrigger, deps: RunDeps =
   };
   try {
     const sources = repo.listSources().filter((s) => !deps.sourceIds || deps.sourceIds.includes(s.id));
+    const plan = searchPlan(repo);
+    const excludedForAll = sourcesExcludedByEveryone(plan.rules);
     stats.sourcesTotal = sources.length;
     progress("start");
     for (const s of sources) {
@@ -168,6 +249,14 @@ export async function runSearch(repo: Repo, trigger: RunTrigger, deps: RunDeps =
         cancelled = true;
         const id = repo.addAttempt(runId, s.id, "cancelled", at);
         repo.finishAttempt(id, { status: "cancelled" });
+        continue;
+      }
+      if (excludedForAll.has(s.id)) {
+        // Все настоящие профили исключили эту площадку в своих инструкциях — её не опрашиваем
+        const id = repo.addAttempt(runId, s.id, "excluded", at);
+        repo.finishAttempt(id, { status: "excluded", error: "Исключено вашими инструкциями для ИИ / excluded by your AI instructions" });
+        stats.sourcesDisabled++;
+        progress("source", s.id, "excluded");
         continue;
       }
       if (!s.enabled) {
@@ -199,8 +288,12 @@ export async function runSearch(repo: Repo, trigger: RunTrigger, deps: RunDeps =
           maxPages: s.maxPages,
           companies: s.kind === "ats" ? repo.watchedAtsCompanies() : undefined,
           pauseMs: deps.pauseMs,
+          queries: plan.queries,
+          countries: plan.countries,
+          credentials: deps.credentials,
         });
         stats.rawItems += res.items.length;
+        deps.onRawItems?.(s.id, res.items);
         const now = nowFn();
         repo.transaction(() => {
           for (const raw of res.items) {
@@ -255,23 +348,7 @@ export async function runSearch(repo: Repo, trigger: RunTrigger, deps: RunDeps =
         else if (it.fit === "unsuitable") stats.unsuitable++;
       }
     }
-    // Уведомления только о новых/изменившихся подходящих или требующих уточнения, без повторов.
-    for (const ch of changed) {
-      if (!newOrChanged.has(ch.vacancyId)) continue;
-      if (ch.fit !== "suitable" && ch.fit !== "needs_check") continue;
-      const v = repo.getVacancy(ch.vacancyId);
-      const app = repo.getApplication(ch.candidateId, ch.vacancyId);
-      if (!v || app?.stage === "archived") continue;
-      const ok = repo.addNotification({
-        candidateId: ch.candidateId,
-        kind: ch.previousFit ? "changed_match" : "new_match",
-        dedupeKey: `${ch.candidateId}:${ch.vacancyId}:${ch.fit}:${v.contentHash}`,
-        title: ch.fit === "suitable" ? msg("Подходящая вакансия", "Matching job") : msg("Вакансия требует уточнения", "Job needs clarification"),
-        body: msg(`${v.title} — ${v.company}`, `${v.title} — ${v.company}`),
-        vacancyId: v.id,
-      });
-      if (ok) stats.notifications++;
-    }
+    stats.notifications += notifyMatches(repo, changed, newOrChanged);
     const attempted = stats.sourcesSucceeded + stats.sourcesFailed + stats.sourcesBlocked;
     let status: RunStatus;
     if (cancelled) status = "cancelled";

@@ -84,6 +84,34 @@ export interface SearchRules {
   };
   excludedKeywords: string[];
   freshnessDays: number;
+  /** «Дополнительные инструкции для ИИ» — свои слова человека и их разбор (хранятся в версии профиля). */
+  aiInstructions?: AiInstructions;
+}
+
+export type WorkFormat = "remote" | "hybrid" | "office";
+
+export interface InstructionDirectives {
+  excludeSources: string[];
+  excludeHosts: string[];
+  excludeKeywords: string[];
+  requireKeywords: string[];
+  countries: string[];
+  excludeCountries: string[];
+  postingLanguages: string[];
+  workFormats: WorkFormat[];
+  /** Фрагменты, которые не превратились в правило: их проверяет ИИ по каждой вакансии (если он подключён). */
+  notes: string[];
+}
+
+export interface AiInstructions {
+  text: string;
+  parsed: InstructionDirectives | null;
+  parsedBy: "rules" | "rules+ai" | null;
+  parsedAt: string | null;
+  /** Текст, по которому сделан разбор (если текст изменился — разбор пересчитывается). */
+  parsedFor?: string;
+  /** Решения человека по противоречиям: id противоречия → что главнее. */
+  resolutions: Record<string, "instruction" | "settings">;
 }
 
 export interface Candidate {
@@ -128,6 +156,10 @@ export type SourceKind =
   | "workingnomads"
   | "weworkremotely"
   | "habrcareer"
+  | "hh"
+  | "adzuna"
+  | "themuse"
+  | "arbeitnow"
   | "ats"
   | "import"
   | "demo";
@@ -158,6 +190,7 @@ export type SourceAttemptStatus =
   | "blocked"
   | "not_configured"
   | "disabled"
+  | "excluded"
   | "cancelled";
 
 export interface Coverage {
@@ -292,6 +325,7 @@ export type DimensionKey =
   | "hours"
   | "safety"
   | "exclusions"
+  | "instructions"
   | "skills"
   | "freshness";
 
@@ -467,9 +501,13 @@ export interface ScheduleSettings {
   enabled: boolean;
   paused: boolean;
   cadence: "daily" | "weekly";
-  time: string; // HH:MM в локальном часовом поясе машины
+  time: string; // HH:MM в часовом поясе timezone
   weekday: number; // 1 = понедельник … 7 = воскресенье
   runInBackground: boolean;
+  /** Часовой пояс человека (IANA). По умолчанию — системный. */
+  timezone?: string;
+  /** Искать, даже когда приложение закрыто: системная задача ОС (launchd / Планировщик задач). */
+  osTask?: boolean;
 }
 
 export interface ScheduleState {

@@ -2,13 +2,13 @@
 
 <h1 align="center">Job Search Desktop</h1>
 
-<p align="center"><b>Находит вакансии и отмечает главное: что подходит, что уточнить, что нет.</b><br>
+<p align="center"><b>Ищет работу за вас и отмечает главное: что подходит, что уточнить, что нет.</b><br>
 Бесплатное приложение для macOS и Windows. Интерфейс на русском и английском.</p>
 
 <p align="center">
   <a href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg"><b>Скачать для macOS</b></a> (Apple Silicon)
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe"><b>Скачать для Windows</b></a> (x64)
+  <a href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe"><b>Скачать для Windows</b></a> (10 и 11, 64-бит)
   &nbsp;&nbsp;|&nbsp;&nbsp;
   <a href="https://gomin1i.github.io/job-search-desktop/">Сайт и ролик</a>
 </p>
@@ -17,14 +17,17 @@
 
 > English version is [below](#english).
 
-Вы один раз говорите, что вам подходит: страна, языки, направления, минимальная оплата, без звонков или со звонками. Приложение само обходит открытые сайты с вакансиями, убирает дубли и проверяет каждое объявление по вашим условиям. Каждый вывод подтверждён цитатой из текста. Если в объявлении чего-то нет, оно помечено «уточнить», а не угадано. Отклик всегда отправляете вы.
+## Зачем это
+
+Искать работу — значит каждый день открывать десятки сайтов, читать одинаковые объявления и выяснять, подходят ли они вам: страна найма, язык, оплата, формат, звонки. Job Search Desktop делает эту рутину сам — утром, ночью, пока вы спите или заняты. Вы один раз настраиваете поиск под себя, а приложение по расписанию обходит сайты с вакансиями, убирает дубли, проверяет каждое объявление по вашим условиям и показывает готовый результат. Каждый вывод подтверждён цитатой из объявления; если чего-то в тексте нет, это помечено «уточнить», а не угадано. Откликаетесь вы сами.
+
+Подходит людям в любой стране, которые ищут удалённую, гибридную или офисную работу и хотят тратить время только на подходящие вакансии.
 
 ## Как это выглядит
 
-| Настройка за пару минут | Настоящий поиск по сайтам | Разбор вакансии и отклик |
+| Настройка за пару минут | Поиск по сайтам | Разбор вакансии и отклик |
 |---|---|---|
-| ![Настройка профиля](docs/media/demo-setup.gif) | ![Поиск по открытым источникам](docs/media/demo-search.gif) | ![Карточка вакансии с цитатами](docs/media/demo-results.gif) |
-| Знакомство, о вас, что ищете, где искать | Запись реального запуска, ускорено | Демо-данные, вымышленные компании |
+| ![Настройка профиля](docs/media/demo-setup.gif) | ![Поиск по источникам](docs/media/demo-search.gif) | ![Карточка вакансии с цитатами](docs/media/demo-results.gif) |
 
 <table>
 <tr>
@@ -39,14 +42,14 @@
 
 ## Что умеет
 
-- **Простой первый запуск.** Шесть шагов простыми словами: что делает приложение, о вас, что ищете, где искать, помощник (нейросеть), первый поиск и объяснение результатов. Есть «Назад», черновик сохраняется, любой шаг можно пропустить. Подсказки по экрану открываются снова из «Как это работает».
-- **Поиск по открытым источникам:** Jobicy, Remotive, Remote OK, Himalayas, Working Nomads, We Work Remotely, Хабр Карьера и публичные доски компаний на Greenhouse, Lever и Ashby. Приложение соблюдает их лимиты и правила, прогресс по каждому сайту виден во время поиска.
-- **Маркер вместо догадок.** Каждое условие отмечено: ✓ подходит, ? уточнить, ✕ не подходит. Цвет всегда дублируется значком и словом. «Worldwide» не считается доказательством найма из вашей страны, «до $1000» не выполняет минимум, часы пересчитываются в ваш часовой пояс.
-- **Отклики под контролем.** Этапы, чек-лист перед отправкой, напоминания, черновики писем и резюме только из подтверждённых фактов вашего профиля, версии документов. Приложение ничего не отправляет само.
-- **Нейросеть на вашем компьютере.** Ollama и модели Gemma ставятся прямо из настроек (подробнее ниже). Облачная модель тоже возможна, но не обязательна. Без нейросети работает всё, кроме кнопок «Разобрать с AI».
-- **Данные у вас.** База SQLite в папке пользователя, резервные копии перед миграциями и импортом, импорт CSV/JSON, полный экспорт. Ключи облачных моделей хранятся в системном хранилище (Keychain/DPAPI).
-- **Расписание.** Ежедневный или еженедельный поиск, пока приложение запущено (это локальный таймер: на выключенном компьютере поиск не идёт).
-- **Демо-режим** на вымышленных данных, явно помеченный и отдельный от ваших.
+- **Настраивается под вас.** Страна, город и часовой пояс, языки письменно и устно, направления (26 готовых шаблонов и свои), формат работы, минимальная оплата в нужных валютах, звонки, опыт. Каждое условие можно сделать обязательным, желательным или не задавать.
+- **Дополнительные инструкции для ИИ.** Отдельное поле, где вы своими словами пишете, что учитывать: «Не используй hh.ru и связанные сервисы», «Рассматривай вакансии из Германии и Польши», «Только удалённо, без продаж». Приложение сразу показывает, как поняло инструкции, и применяет их при каждом поиске: исключённые площадки не опрашиваются, требования участвуют в оценке. Если инструкция противоречит настройкам профиля, приложение спросит, что главнее.
+- **Ищет широко.** Поиск по вашим направлениям с постраничной выдачей, а не только свежие объявления: Himalayas, The Muse, Arbeitnow, Jobicy, Remotive, Remote OK, Working Nomads, We Work Remotely, Хабр Карьера, открытые страницы компаний на Greenhouse, Lever и Ashby. По вашему доступу подключаются hh.ru и Adzuna (19 стран). Дубли между сайтами объединяются. Какие источники использовать, решаете вы.
+- **Ищет сам, по расписанию.** Каждый день или неделю в вашем часовом поясе. Когда приложение закрыто, поиск запускает система и присылает уведомление; если компьютер спал, поиск выполнится после пробуждения. С сервером поиска — и когда компьютер выключен: результаты ждут вас при возвращении.
+- **Объясняет каждый вывод.** «Подходит», «Уточнить», «Не подходит» — у каждого условия цитата из объявления. «Worldwide» не считается наймом из вашей страны, «до $1000» не выполняет минимум, часы пересчитываются в ваш часовой пояс.
+- **Помогает с откликами.** Этапы, чек-лист перед отправкой, напоминания, черновики писем и резюме только из подтверждённых фактов. Документы можно импортировать из PDF и DOCX (текст извлекается) и экспортировать в DOCX, PDF, HTML, Markdown и TXT.
+- **Нейросеть на вашем компьютере.** Ollama и модели Gemma ставятся прямо из приложения, бесплатно. Облачная модель — по желанию. Без нейросети работает всё, кроме разбора с ИИ.
+- **Данные у вас.** Всё хранится на вашем компьютере; ключи и токены — в системном хранилище (Keychain / DPAPI). Экспорт, резервная копия и импорт встроены.
 
 ## Установка
 
@@ -54,64 +57,48 @@
 
 1. Скачайте [Job-Search-Desktop-mac-arm64.dmg](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg) и откройте его.
 2. Перетащите приложение в «Программы».
-3. Сборка пока не подписана сертификатом Apple, поэтому при первом запуске macOS его не откроет. Попробуйте открыть один раз, затем зайдите в «Системные настройки», раздел «Конфиденциальность и безопасность», и нажмите «Всё равно открыть».
+3. Приложение пока не подписано сертификатом Apple, поэтому при первом запуске macOS его не откроет. Попробуйте открыть один раз, затем зайдите в «Системные настройки», раздел «Конфиденциальность и безопасность», и нажмите «Всё равно открыть».
 
-Требования: macOS 13 или новее, Mac на Apple Silicon (M1 и новее). Сборки для Intel-Mac пока нет.
+Нужен Mac на Apple Silicon (M1 и новее) с macOS 13 или новее.
 
 ### Windows
 
 1. Скачайте [Job-Search-Desktop-windows-x64-setup.exe](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe) и запустите.
-2. Установщик не подписан, поэтому SmartScreen предупредит: нажмите «Подробнее», затем «Выполнить в любом случае».
-3. Можно выбрать папку установки; ярлык появится в меню «Пуск».
+2. Установщик пока не подписан, поэтому SmartScreen предупредит: нажмите «Подробнее», затем «Выполнить в любом случае».
+3. Выберите папку установки; ярлык появится в меню «Пуск».
 
-Требования: Windows 10 или 11, 64-бит.
+Нужен Windows 10 или 11, 64-бит.
 
-### Ресурсы
+## Первый запуск
 
-| | Само приложение | С локальной нейросетью |
-|---|---|---|
-| Память | около 450 МБ при работе | лёгкая модель: от 8 ГБ ОЗУ, точная: от 16 ГБ |
-| Диск | около 400 МБ | плюс Ollama (≈ 0,2 ГБ на Mac, ≈ 1,7 ГБ на Windows) и модель (4,6 или 6,6 ГБ) |
-| Интернет | только для поиска вакансий | плюс однократная загрузка модели |
+Шесть шагов простыми словами: что делает приложение, о вас, что ищете (здесь же — дополнительные инструкции для ИИ), где искать, помощник-нейросеть и первый поиск. Шаги можно пропускать и возвращаться; подсказки по экрану открываются снова из «Как это работает».
+
+## Что нужно знать
+
+- **hh.ru** с апреля 2026 года отдаёт поиск вакансий только с OAuth-токеном. Чтобы искать там, в «Настройках», раздел «Источники», введите данные приложения, зарегистрированного на [dev.hh.ru](https://dev.hh.ru), и войдите через свой аккаунт hh.ru. Источник включается после успешного проверочного поиска.
+- **Adzuna** требует бесплатный ключ разработчика ([developer.adzuna.com](https://developer.adzuna.com)).
+- **Поиск при выключенном компьютере** работает через сервер поиска. Подключите его в «Настройках», раздел «Поиск и расписание». Свой сервер разворачивается по [инструкции](server/README.md). На сервер уходят ваши профили поиска, выбранные источники и расписание; доступы к hh.ru и Adzuna — только если вы это разрешите.
+- **Нейросеть локально.** Лёгкой модели нужно от 8 ГБ памяти и около 4,6 ГБ на диске, точной — от 16 ГБ памяти и около 6,6 ГБ. Размер и требования видны до загрузки.
 
 ## Нейросеть: локально и бесплатно
 
-В разделе «Настройки», вкладка «AI» (и на шаге «Помощник» первого запуска):
-
-| Модель | Загрузка | Нужно памяти | Кому подходит |
+| Модель | Загрузка | Память | Кому подходит |
 |---|---|---|---|
-| **Лёгкая:** Gemma 4 E2B (`gemma4:e2b`) | ≈ 4,6 ГБ | от 8 ГБ ОЗУ | ноутбуки, быстрее отвечает |
-| **Точнее:** Gemma 4 E4B (`gemma4:e4b`) | ≈ 6,6 ГБ | от 16 ГБ ОЗУ | точнее с деталями, медленнее |
+| **Лёгкая:** Gemma 4 E2B | ≈ 4,6 ГБ | от 8 ГБ | ноутбуки, быстрее отвечает |
+| **Точнее:** Gemma 4 E4B | ≈ 6,6 ГБ | от 16 ГБ | точнее с деталями, медленнее |
 
-- Перед загрузкой показан размер, требования к памяти, ваша память и свободное место на диске. Приложение рекомендует модель под ваш компьютер. Ничего большого не скачивается без вашего нажатия и подтверждения.
-- Во время загрузки видны прогресс и скорость. Загрузку можно остановить и продолжить с того же места. Ошибки объясняются простыми словами.
-- После загрузки модель проверяется настоящим разбором тестовой вакансии и только затем включается. Модель можно удалить одной кнопкой.
-- Если Ollama ещё не установлена, приложение скачивает официальный установщик с GitHub-релиза Ollama и проверяет его контрольную сумму SHA-256. На Mac Ollama распаковывается в `~/Applications` и запускается; на Windows открывается официальный установщик.
+Приложение рекомендует модель под ваш компьютер и ничего большого не скачивает без подтверждения. Загрузку можно остановить и продолжить; после загрузки модель проверяется и включается, удаляется одной кнопкой. С локальной моделью текст вакансий и ваш профиль обрабатываются только на вашем компьютере. Облачная модель (Anthropic или любой OpenAI-совместимый сервис) подключается отдельно, по вашему ключу.
 
-**Что остаётся на компьютере:** при локальной модели текст вакансий и ваш профиль обрабатываются только на вашем компьютере. В интернет уходят лишь запросы к сайтам с вакансиями и однократная загрузка Ollama и модели. Облачная модель (Anthropic или любой OpenAI-совместимый сервис) включается отдельно, по вашему ключу.
+## Приватность
 
-Замер на 5 реальных вакансиях (MacBook Pro M4 Pro, 24 ГБ): E2B вернула корректный разбор в 4 случаях из 5, в среднем за 12,6 с; E4B вернула корректный разбор во всех 5, в среднем за 24,6 с. Интерфейс во время разбора не тормозит: клик обрабатывается за 25 мс. Данные замера лежат в `artifacts/`.
-
-## Что проверено, а что нет
-
-- **macOS (Apple Silicon):** `.dmg` скачан из релиза по ссылке выше, смонтирован и проверен; автотесты окна (E2E) против приложения из него пройдены на русском и английском (24 из 24); замерена производительность. Установка Ollama и загрузка модели проверены на настоящем движке: остановка на 35 %, продолжение, проверка, удаление.
-- **Windows:** установщик собирается в GitHub Actions на `windows-latest`; там же E2E против собранного приложения (23 из 23; шаг с настоящей моделью пропущен, на сервере нет Ollama) и замер производительности. На физическом компьютере с Windows установщик вручную не запускался, установка Ollama на Windows не проверялась.
-- Сборки не подписаны и не нотаризованы.
-
-## Чего нет
-
-- Облачного сервера нет: поиск по расписанию идёт, только пока приложение запущено.
-- Охват неполный: ленты отдают последние объявления, а не весь рынок.
-- Нет экспорта в DOCX (есть PDF, HTML, Markdown, TXT); текст из импортированных PDF/DOCX не извлекается.
-- hh.ru и сервисы HeadHunter не используются ни в каком виде.
+Приложение ходит в сеть только к выбранным сайтам с вакансиями, к выбранной модели (если она облачная), к странице вакансии, когда вы нажимаете «Перепроверить», и к серверу поиска, если вы его подключили. Оно не отправляет отклики, письма и формы, не регистрирует аккаунты и не проходит тесты за вас.
 
 ## Разработка
 
-Нужен Node.js 22 или новее (проверено на 24 и 25).
+Нужен Node.js 22 или новее.
 
 ```bash
 npm ci
-npm run typecheck
 npm test
 npm start
 ```
@@ -119,39 +106,36 @@ npm start
 | Команда | Что делает |
 |---|---|
 | `npm run dev` | Vite и Electron с горячей перезагрузкой интерфейса |
-| `npm run e2e` | настоящее окно Electron на синтетических данных, скриншоты в `docs/screenshots/` |
-| `npm run dist:mac` | `.dmg` для Apple Silicon |
-| `npm run dist:win` | NSIS-установщик для Windows x64 (на Windows или в CI) |
-| `node scripts/perf.mjs` | замер времени запуска, памяти и отклика интерфейса |
-| `node scripts/record-demos.mjs <папка>` | запись демо-видео для сайта и ролика |
-| `node dist/cli.js run \| reassess \| ai-bench \| ollama-selftest \| summary` | те же функции из командной строки |
+| `npm run e2e` | настоящее окно Electron на синтетических данных |
+| `npm run dist:mac` / `npm run dist:win` | установщики для macOS и Windows |
+| `node server/dist/server.js` | сервер поиска (после `npm run build`), см. [server/README.md](server/README.md) |
+| `node dist/cli.js run --data <папка>` | поиск из командной строки |
 
-Структура: `src/core` (правила и решение), `src/db` (SQLite), `src/sources` (адаптеры сайтов), `src/pipeline` (поиск), `src/ai` (модели), `src/main` (Electron, IPC, Ollama), `src/renderer` (интерфейс на React). Ролик собирается из `film/` (Remotion, музыка синтезируется на numpy, мастер в ffmpeg: `bash film/make_film.sh`). Сайт лежит в `site/` и публикуется на GitHub Pages.
+Структура: `src/core` (правила, инструкции, расписание), `src/sources` (сайты с вакансиями), `src/pipeline` (поиск), `src/ai` (модели), `src/docs` (документы), `src/main` (Electron, доступы, фоновые задачи, сервер поиска), `src/renderer` (интерфейс), `server` (сервер поиска), `site` (сайт), `film` (ролик).
 
-Документация: [дизайн](docs/DESIGN.md), [сборка и подпись](docs/BUILD.md), [источники](docs/SOURCES.md), [решения](docs/DECISIONS.md), [статус](IMPLEMENTATION_STATUS.md).
-
-## Приватность
-
-Все данные хранятся локально. Приложение ходит в сеть только к включённым сайтам с вакансиями, к выбранной модели (если она облачная) и к странице вакансии, когда вы нажимаете «Перепроверить». Оно не отправляет отклики, письма и формы, не регистрирует аккаунты и не проходит тесты за вас.
+Документация: [дизайн](docs/DESIGN.md), [сборка и подпись](docs/BUILD.md), [источники](docs/SOURCES.md), [архитектура](docs/DECISIONS.md).
 
 ## Лицензия
 
-Код: MIT, см. [LICENSE](LICENSE). Шрифт Golos Text: SIL OFL 1.1. Модели Gemma распространяются на условиях [Gemma Terms of Use](https://ollama.com/library/gemma4); Ollama: MIT.
+Код: MIT, см. [LICENSE](LICENSE). Шрифт Golos Text: SIL OFL 1.1. Модели Gemma — на условиях [Gemma Terms of Use](https://ollama.com/library/gemma4); Ollama: MIT.
 
 ---
 
 ## English
 
-**Finds jobs and marks what matters: what fits, what to clarify, what doesn't.** A free desktop app for macOS and Windows with a Russian and English interface.
+**Searches for jobs for you and marks what matters: fits, clarify, doesn't fit.** A free desktop app for macOS and Windows with a Russian and English interface.
 
-Downloads: [macOS (Apple Silicon)](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg), [Windows x64](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe), [website and film](https://gomin1i.github.io/job-search-desktop/).
+Downloads: [macOS (Apple Silicon)](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg), [Windows 10/11 x64](https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe), [website and film](https://gomin1i.github.io/job-search-desktop/).
 
-Tell the app once what works for you: country, languages, job areas, minimum pay, calls or no calls. It checks open job sites (Jobicy, Remotive, Remote OK, Himalayas, Working Nomads, We Work Remotely, Habr Career, and public Greenhouse, Lever and Ashby boards) within their limits, removes duplicates, and checks every posting against your rules. Each verdict is backed by a quote from the posting; anything the posting doesn't say is marked "clarify" instead of guessed. You always send applications yourself.
+Job hunting means opening dozens of sites every day and checking whether each posting really fits: country of hiring, language, pay, format, calls. Job Search Desktop does that routine for you — in the morning, at night, while you sleep. Set up your search once; the app checks job sites on a schedule, removes duplicates, checks every posting against your conditions and shows the results. Every verdict is backed by a quote; anything the posting doesn't say is marked "clarify" instead of guessed. You always apply yourself.
 
-- **First run in six plain steps,** with back, saved progress, skippable steps, and an on-screen tour you can reopen.
-- **Local AI, free:** install Ollama and Gemma 4 E2B (≈ 4.6 GB, 8 GB RAM) or E4B (≈ 6.6 GB, 16 GB RAM) from inside the app. You see size and requirements first, get a recommendation, and confirm before anything large downloads. Progress, pause and resume, verification, and removal are built in. With a local model, posting text and your profile never leave your computer. Cloud models (Anthropic or any OpenAI-compatible API) are optional.
-- **Install on macOS:** open the `.dmg`, drag the app to Applications. The build is not signed yet: open it once, then go to System Settings, Privacy & Security, and click Open Anyway. Requires macOS 13+ on Apple Silicon.
-- **Install on Windows:** run the installer; SmartScreen will warn because it is unsigned: click More info, then Run anyway. Requires Windows 10 or 11, 64-bit.
-- **Verified:** the released macOS `.dmg` was downloaded, mounted and passed E2E tests in RU and EN (24/24), with performance measured. The Windows build and E2E tests (23/23) run on GitHub Actions `windows-latest`; the installer has not been run on a physical Windows PC, and installing Ollama on Windows has not been tested.
+- **Your own instructions for AI:** write in your own words which sites to skip, which countries and languages to consider and what to avoid. You see how the app understood them; they apply on every search, and conflicts with your settings are yours to resolve.
+- **Wide search:** search by your job areas with pagination across Himalayas, The Muse, Arbeitnow, Jobicy, Remotive, Remote OK, Working Nomads, We Work Remotely, Habr Career and Greenhouse/Lever/Ashby company boards; hh.ru and Adzuna (19 countries) connect with your own access. You choose the sources.
+- **Searches on its own:** daily or weekly in your time zone. When the app is closed, the system runs the search and notifies you; after sleep it runs on wake-up. With a search server it also runs while the computer is off.
+- **Documents:** import PDF and DOCX (text is extracted; scans are flagged for OCR), export to DOCX, PDF, HTML, Markdown and TXT.
+- **Local AI, free:** Ollama and Gemma 4 install from inside the app.
+- **Install on macOS:** open the `.dmg` and drag the app to Applications. It is not signed yet: open it once, then go to System Settings, Privacy & Security, and click Open Anyway. Requires Apple Silicon and macOS 13+.
+- **Install on Windows:** run the installer; SmartScreen will warn because it is not signed yet: click More info, then Run anyway. Requires Windows 10 or 11, 64-bit.
+- **Good to know:** hh.ru requires an OAuth token since April 2026 (an app registered at dev.hh.ru plus your hh.ru sign-in); Adzuna needs a free developer key; searching while the computer is off needs a search server ([guide](server/README.md)).
 
 Development: `npm ci && npm test && npm start`. License: MIT.

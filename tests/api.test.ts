@@ -75,19 +75,21 @@ describe("API главного процесса", () => {
     expect(aiR.code).toBe("no_provider");
   });
 
-  it("внешние ссылки: hh.ru и небезопасные схемы не открываются", async () => {
+  it("внешние ссылки: исключённые пользователем домены и небезопасные схемы не открываются; hh.ru по умолчанию открывается", async () => {
     const { api, opened } = setup();
-    expect((await api("vacancies.openExternal", { url: "https://hh.ru/vacancy/1" })).ok).toBe(false);
+    expect((await api("vacancies.openExternal", { url: "https://hh.ru/vacancy/1" })).ok).toBe(true);
+    expect((await api("excluded.add", { host: "blocked.example" })).ok).toBe(true);
+    expect((await api("vacancies.openExternal", { url: "https://blocked.example/vacancy/1" })).ok).toBe(false);
     expect((await api("vacancies.openExternal", { url: "javascript:alert(1)" })).ok).toBe(false);
     expect((await api("vacancies.openExternal", { url: "https://example.com/job/1" })).ok).toBe(true);
-    expect(opened).toEqual(["https://example.com/job/1"]);
+    expect(opened).toEqual(["https://hh.ru/vacancy/1", "https://example.com/job/1"]);
   });
 
-  it("интервал источника не опускается ниже официального лимита; встроенное исключение не удаляется", async () => {
+  it("интервал источника не опускается ниже официального лимита; исключения добавляет и снимает пользователь", async () => {
     const { api } = setup();
     const r: any = await api("sources.update", { id: "remotive", minIntervalMinutes: 60 });
     expect(r.data.minIntervalMinutes).toBe(360);
-    expect((await api("excluded.remove", { host: "hh.ru" })).ok).toBe(false);
+    expect(((await api("excluded.list", {})) as any).data).toEqual([]);
     expect((await api("excluded.add", { host: "spam.example" })).ok).toBe(true);
     expect((await api("excluded.remove", { host: "spam.example" })).ok).toBe(true);
   });

@@ -1,24 +1,30 @@
-// Политика исключённых источников и канонические URL.
+// Исключённые пользователем источники и канонические URL.
 // Исключённый домен запрещён в любой форме: прямой адрес, поддомен, зеркало,
-// URL-параметр редиректа (?url=https://hh.ru/...), закодированная ссылка внутри другого URL.
+// URL-параметр редиректа (?url=https://example.com/...), закодированная ссылка внутри другого URL.
 
 export interface ExcludedHost {
   host: string; // домен без схемы; правило действует и на поддомены
   reason: string;
 }
 
-/** Поставляемый первоначальный набор. hh.ru и бренды HeadHunter исключены по умолчанию. */
-export const DEFAULT_EXCLUDED_HOSTS: ExcludedHost[] = [
-  { host: "hh.ru", reason: "Исключён политикой по умолчанию (HeadHunter) — любые формы" },
-  { host: "headhunter.ru", reason: "Бренд HeadHunter" },
-  { host: "hh.kz", reason: "Бренд HeadHunter" },
-  { host: "hh.uz", reason: "Бренд HeadHunter" },
-  { host: "hh1.az", reason: "Бренд HeadHunter" },
-  { host: "headhunter.ge", reason: "Бренд HeadHunter" },
-  { host: "headhunter.kg", reason: "Бренд HeadHunter" },
-  { host: "rabota.by", reason: "Бренд HeadHunter (Беларусь)" },
-  { host: "hhcdn.ru", reason: "CDN HeadHunter" },
-  { host: "hh.ua", reason: "Бренд HeadHunter" },
+/** По умолчанию приложение ничего не исключает: источники выбирает сам пользователь. */
+export const DEFAULT_EXCLUDED_HOSTS: ExcludedHost[] = [];
+
+/**
+ * Справочник семейств сервисов: если пользователь исключает «hh.ru и связанные сервисы»,
+ * исключаются все домены семейства. Сам по себе справочник ничего не блокирует.
+ */
+export const SERVICE_FAMILIES: Array<{ id: string; names: string[]; sourceIds: string[]; hosts: string[] }> = [
+  {
+    id: "headhunter",
+    names: ["hh.ru", "hh", "headhunter", "хедхантер", "хэдхантер", "хх", "хх.ру", "hh.kz", "rabota.by"],
+    sourceIds: ["hh"],
+    hosts: ["hh.ru", "headhunter.ru", "hh.kz", "hh.uz", "hh1.az", "headhunter.ge", "headhunter.kg", "rabota.by", "hhcdn.ru", "hh.ua"],
+  },
+  { id: "linkedin", names: ["linkedin", "линкедин", "линкедин.com"], sourceIds: [], hosts: ["linkedin.com", "lnkd.in"] },
+  { id: "indeed", names: ["indeed", "индид"], sourceIds: [], hosts: ["indeed.com"] },
+  { id: "habr", names: ["хабр", "habr", "хабр карьера", "career.habr.com"], sourceIds: ["habrcareer"], hosts: ["career.habr.com"] },
+  { id: "superjob", names: ["superjob", "суперджоб"], sourceIds: [], hosts: ["superjob.ru"] },
 ];
 
 export const ALLOWED_OPEN_SCHEMES = new Set(["https:", "http:", "mailto:"]);
@@ -120,6 +126,6 @@ export function safeExternalUrl(rawUrl: string, excluded: ExcludedHost[]): { ok:
   }
   if (!ALLOWED_OPEN_SCHEMES.has(u.protocol)) return { ok: false, reason: `Схема ${u.protocol} не разрешена` };
   const blocked = blockedReason(rawUrl, excluded);
-  if (blocked) return { ok: false, reason: `Источник исключён политикой: ${blocked}` };
+  if (blocked) return { ok: false, reason: `Источник исключён в ваших настройках: ${blocked}` };
   return { ok: true, url: u.toString() };
 }

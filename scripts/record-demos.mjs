@@ -33,7 +33,7 @@ async function session(name, fn, { demo = false } = {}) {
   if (only && !only.includes(name)) return;
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), `jsd-rec-${name}-`));
   const vdir = fs.mkdtempSync(path.join(os.tmpdir(), `jsd-vid-${name}-`));
-  const app = await electron.launch({ args: ["."], env: { ...process.env, JSD_USER_DATA: dataDir } });
+  const app = await electron.launch({ args: ["."], env: { ...process.env, JSD_USER_DATA: dataDir, JSD_NO_OS_TASK: "1" } });
   const win = await app.firstWindow();
   await win.waitForSelector("#root *", { timeout: 60000 });
   await app.evaluate(({ BrowserWindow }, [w, h]) => { const b = BrowserWindow.getAllWindows()[0]; b.setContentSize(w, h); b.center(); }, [W, H]);

@@ -27,3 +27,10 @@ film/node_modules/
 film/renders/
 film/audio/mix.wav
 film/renders-log.txt
+
+# Внутренние отчёты о проверках и замерах (не публикуются)
+artifacts/
+IMPLEMENTATION_STATUS.md
+
+# Данные приложения hh.ru владельца сборки (секрет)
+build/hh-client.json

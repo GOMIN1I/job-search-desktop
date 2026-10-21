@@ -5,6 +5,8 @@ import { call } from "../api";
 import { useApp } from "../state";
 import { Modal, useBusy, useToast } from "../components/ui";
 import { LocalModels } from "../components/LocalModels";
+import { SourceAccess } from "../components/SourceAccess";
+import { CloudPanel } from "../components/CloudPanel";
 
 type Tab = "search" | "sources" | "ai" | "data" | "privacy" | "log";
 
@@ -37,7 +39,14 @@ function SearchTab() {
   const app = useApp();
   const { push } = useToast();
   const { run } = useBusy();
-  const [d, setD] = useState<{ settings: ScheduleSettings; next: string | null; events: Array<{ kind: string; slot: string | null; note: string; createdAt: string }> } | null>(null);
+  const [d, setD] = useState<{ settings: ScheduleSettings; next: string | null; events: Array<{ kind: string; slot: string | null; note: string; createdAt: string }>; osTask: { supported: boolean; installed: boolean; wanted: boolean; detail: string } | null } | null>(null);
+  const zones = (() => {
+    try {
+      return (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf("timeZone");
+    } catch {
+      return [Intl.DateTimeFormat().resolvedOptions().timeZone];
+    }
+  })();
   useEffect(() => {
     void call("schedule.get").then(setD as any);
   }, [app.version]);
@@ -68,12 +77,20 @@ function SearchTab() {
           <div className="field"><label htmlFor="cad">{t("set.sched.cadence")}</label><select id="cad" className="select" value={s.cadence} disabled={!s.enabled} onChange={(e) => save({ cadence: e.target.value as ScheduleSettings["cadence"] })}><option value="daily">{t("set.sched.daily")}</option><option value="weekly">{t("set.sched.weekly")}</option></select></div>
           {s.cadence === "weekly" && <div className="field"><label htmlFor="wd">{t("set.sched.weekday")}</label><select id="wd" className="select" value={s.weekday} disabled={!s.enabled} onChange={(e) => save({ weekday: Number(e.target.value) })}>{days.map((dd, i) => <option key={i} value={i + 1}>{dd}</option>)}</select></div>}
           <div className="field"><label htmlFor="tm">{t("set.sched.time")}</label><input id="tm" type="time" className="input" value={s.time} disabled={!s.enabled} onChange={(e) => e.target.value && save({ time: e.target.value })} /></div>
+          <div className="field"><label htmlFor="tz">{lang === "ru" ? "Часовой пояс" : "Time zone"}</label><select id="tz" className="select" value={s.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone} disabled={!s.enabled} onChange={(e) => save({ timezone: e.target.value })}>{zones.map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}</select></div>
           <label className="check" style={{ marginTop: 20 }}><input type="checkbox" checked={s.paused} disabled={!s.enabled} onChange={(e) => save({ paused: e.target.checked })} />{t("set.sched.paused")}</label>
         </div>
+        <label className="check"><input type="checkbox" checked={s.osTask !== false} disabled={!s.enabled} onChange={(e) => save({ osTask: e.target.checked })} /><span><strong>{lang === "ru" ? "Искать, даже когда приложение закрыто" : "Search even when the app is closed"}</strong><br /><span className="small subtle">{lang === "ru" ? "Система запустит поиск в назначенное время без окна и пришлёт уведомление. Если компьютер спал, поиск выполнится после пробуждения." : "The system starts the search at the set time without a window and sends a notification. If the computer was asleep, the search runs after wake-up."}</span></span></label>
+        {s.enabled && s.osTask !== false && d.osTask?.wanted && (
+          d.osTask.installed
+            ? <span className="verdict v-yes"><span className="glyph">✓</span>{lang === "ru" ? "Системная задача установлена" : "System task installed"}</span>
+            : <span className="verdict v-no"><span className="glyph">✕</span>{lang === "ru" ? `Системная задача не установлена: ${d.osTask.detail}` : `System task not installed: ${d.osTask.detail}`}</span>
+        )}
         <label className="check"><input type="checkbox" checked={s.runInBackground} onChange={(e) => save({ runInBackground: e.target.checked })} />{t("set.sched.background")}</label>
         {s.enabled && <p className="small">{t("today.nextRun")}: <strong>{d.next ? date(d.next, true) : "—"}</strong></p>}
         <div className="banner banner-info">{t("set.sched.local")}</div>
       </div></div>
+      <CloudPanel />
       <div className="card"><div className="card-header"><h2>{t("set.sched.events")}</h2></div><div className="card-body">
         {d.events.length ? <table className="table"><tbody>{d.events.map((e, i) => <tr key={i}><td className="small nowrap">{date(e.createdAt, true)}</td><td>{e.kind}</td><td className="small">{e.slot ? date(e.slot, true) : ""}</td><td className="small muted">{e.note}</td></tr>)}</tbody></table> : <p className="muted">—</p>}
       </div></div>
@@ -120,8 +137,10 @@ function SourcesTab() {
             ))}
           </tbody>
         </table>
-        <p className="help" style={{ marginTop: 8 }}>{lang === "ru" ? "Интервал не может быть ниже официального ограничения источника. hh.ru и его бренды не поддерживаются." : "The interval cannot go below the source's official limit. hh.ru and its brands are not supported."}</p>
+        <p className="help" style={{ marginTop: 8 }}>{lang === "ru" ? "Интервал не может быть ниже официального ограничения источника. Какие источники использовать, решаете вы: выключите ненужные здесь или напишите об этом в «Дополнительных инструкциях для ИИ» в профиле." : "The interval cannot go below the source's official limit. You decide which sources to use: turn off the ones you don't want here, or say so in “Additional instructions for AI” in your profile."}</p>
       </div></div>
+
+      <SourceAccess />
 
       <div className="card"><div className="card-header"><h2>{t("set.src.companies")}</h2></div><div className="card-body stack">
         <div className="row-wrap">

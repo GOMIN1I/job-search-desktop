@@ -9,7 +9,7 @@ import path from "node:path";
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "jsd-perf-"));
 const exe = process.env.E2E_EXECUTABLE;
 const t0 = Date.now();
-const app = await electron.launch({ ...(exe ? { executablePath: exe, args: [] } : { args: ["."] }), env: { ...process.env, JSD_USER_DATA: dataDir } });
+const app = await electron.launch({ ...(exe ? { executablePath: exe, args: [] } : { args: ["."] }), env: { ...process.env, JSD_USER_DATA: dataDir, JSD_NO_OS_TASK: "1" } });
 const win = await app.firstWindow();
 await win.locator(".onb").waitFor();
 const firstScreenMs = Date.now() - t0;

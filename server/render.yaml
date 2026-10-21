@@ -1,0 +1,18 @@
+# Render.com: Blueprint для сервера поиска (нужен постоянный диск для /data)
+services:
+  - type: web
+    name: jsd-search-server
+    runtime: docker
+    dockerfilePath: server/Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: SERVER_SECRET
+        generateValue: true
+      - key: MAX_ACCOUNTS
+        value: "500"
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

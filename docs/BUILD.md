@@ -41,14 +41,10 @@ npm run dist:win        # NSIS, установка в профиль польз�
 
 Тег `vX.Y.Z` запускает `.github/workflows/release.yml`: сборка на macOS 14 и Windows и загрузка `Job-Search-Desktop-mac-arm64.dmg` и `Job-Search-Desktop-windows-x64-setup.exe` в GitHub Release с тем же тегом. Релиз нужно создать до окончания сборки (`gh release create vX.Y.Z --verify-tag`). Ссылки `releases/latest/download/<файл>` в README и на сайте всегда ведут на последний релиз.
 
-## Что проверено (0.2.1, 2026-10-21)
+## Сервер поиска
 
-| Шаг | macOS arm64 | Windows x64 |
-|---|---|---|
-| Бинарник создан | да, в CI и локально | да, в CI (`windows-latest`) |
-| Запущен | да: dmg скачан из релиза, E2E 24/24 RU и EN против приложения из него | да, в CI: E2E 23/23 против распакованного приложения |
-| Установщик проверен на целевой ОС | dmg смонтирован и проверен (`hdiutil verify`); перенос в «Программы» — стандартный | нет: установщик NSIS на физическом ПК не запускался |
+Сборка: `npm run build` (файл `server/dist/server.js`) или `docker build -f server/Dockerfile .`. Запуск и развёртывание — [server/README.md](../server/README.md).
 
-## Локальная особенность этого Mac
+## Данные приложения hh.ru для сборки
 
-`~/Documents` синхронизируется с iCloud при почти полном диске: файлы выгружаются («dataless»), инструменты сборки падали с `ETIMEDOUT`. Рабочая сборка велась в `dev.nosync/` (не синхронизируется). На другом компьютере это не требуется.
+Если у владельца есть приложение, зарегистрированное на dev.hh.ru, его Client ID и Client Secret можно положить в `build/hh-client.json` (`{"clientId": "...", "clientSecret": "..."}`) или передать переменными `JSD_HH_CLIENT_ID` и `JSD_HH_CLIENT_SECRET`. Файл в git не хранится. Без него пользователи вводят данные приложения сами в настройках источника.

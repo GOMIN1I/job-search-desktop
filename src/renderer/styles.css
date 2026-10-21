@@ -428,3 +428,18 @@ details.more > div { padding: 4px 0 18px; }
   .lane { grid-template-columns: 110px 1fr; }
   .lane .state { grid-column: 2; }
 }
+
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* Дополнительные инструкции для ИИ */
+.instr-text { min-height: 96px; font-size: 14px; }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.chip:hover { border-color: var(--pine); color: var(--ink); }
+.instr-parsed { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; background: var(--sunk); }
+.instr-row { display: grid; grid-template-columns: 170px 1fr; gap: 10px; align-items: baseline; }
+.instr-label { font-size: 12.5px; color: var(--ink-soft); }
+.instr-items { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.instr-conflict { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 12px; background: var(--surface); }
+.instr-conflict legend { font-weight: 600; padding: 0 4px; }
+@media (max-width: 700px) { .instr-row { grid-template-columns: 1fr; } }
+.card-highlight { border-color: color-mix(in srgb, var(--pine) 35%, var(--line)); }

@@ -6,6 +6,10 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Repo } from "../db/repo";
+import { CredentialStore } from "./credentials";
+import type { CloudClient } from "./cloud";
+import { extractText, toDocx } from "../docs/files";
+import { activeDirectives, findConflicts, mergeDirectives, notesHash, parseInstructions, unresolvedConflicts } from "../core/instructions";
 import type { AiSettings, ApplicationStage, Msg, ScheduleSettings, ScheduleState, SearchRules, UiLang } from "../shared/types";
 import { APPLICATION_STAGES, msg } from "../shared/types";
 import { ROLE_TEMPLATES, emptyRules, DEFAULT_EXCLUDED_TOPICS } from "../core/templates";
@@ -79,13 +83,42 @@ export const RulesSchema: z.ZodType<SearchRules> = z.object({
   experience: z.object({ mode, maxYearsRequired: z.number().min(0).max(30), allowSenior: z.boolean() }),
   excludedKeywords: z.array(z.string().max(80)).max(100),
   freshnessDays: z.number().int().min(1).max(365),
+  aiInstructions: z.object({
+    text: z.string().max(4000),
+    parsed: z.object({
+      excludeSources: z.array(z.string().max(60)).max(40), excludeHosts: z.array(z.string().max(120)).max(60),
+      excludeKeywords: z.array(z.string().max(80)).max(60), requireKeywords: z.array(z.string().max(80)).max(40),
+      countries: z.array(z.string().max(4)).max(80), excludeCountries: z.array(z.string().max(4)).max(80),
+      postingLanguages: z.array(z.string().max(8)).max(12), workFormats: z.array(z.enum(["remote", "hybrid", "office"])).max(3),
+      notes: z.array(z.string().max(600)).max(30),
+    }).nullable(),
+    parsedBy: z.enum(["rules", "rules+ai"]).nullable(),
+    parsedAt: z.string().max(40).nullable(),
+    parsedFor: z.string().max(4000).optional(),
+    resolutions: z.record(z.string().max(120), z.enum(["instruction", "settings"])),
+  }).optional(),
 }) as any;
+
+/** Перед сохранением: пустые инструкции удаляются, устаревший разбор пересчитывается правилами. */
+export function normalizeInstructions(rules: SearchRules): SearchRules {
+  const ai = rules.aiInstructions as (SearchRules["aiInstructions"] & { parsedFor?: string }) | undefined;
+  if (!ai) return rules;
+  const text = ai.text.trim();
+  if (!text) {
+    const { aiInstructions: _drop, ...rest } = rules;
+    return rest as SearchRules;
+  }
+  if (!ai.parsed || ai.parsedFor !== text) {
+    return { ...rules, aiInstructions: { ...ai, text, parsed: parseInstructions(text), parsedBy: "rules", parsedAt: new Date().toISOString(), parsedFor: text } as any };
+  }
+  return { ...rules, aiInstructions: { ...ai, text } };
+}
 
 function hashFile(p: string): string {
   return createHash("sha256").update(fs.readFileSync(p)).digest("hex").slice(0, 32);
 }
 
-export function createApi(repo: Repo, platform: Platform) {
+export function createApi(repo: Repo, platform: Platform, creds: CredentialStore = new CredentialStore(repo, platform), cloud?: CloudClient) {
   const pending = new Map<string, { kind: string; data: any; label: string; createdAt: number }>();
   const putPending = (kind: string, data: any, label: string) => {
     const token = createHash("sha256").update(`${kind}${Date.now()}${Math.random()}`).digest("hex").slice(0, 20);
@@ -149,7 +182,15 @@ export function createApi(repo: Repo, platform: Platform) {
     if (!c) throw new ApiError(msg("Кандидат не найден", "Candidate not found"));
     return c;
   };
-  const changed = (what: string) => platform.emit("data-changed", { what });
+  let pushTimer: ReturnType<typeof setTimeout> | null = null;
+  const changed = (what: string) => {
+    platform.emit("data-changed", { what });
+    // Сервер поиска должен знать актуальные профили, источники и расписание
+    if (cloud && ["profile", "candidates", "sources", "excluded", "schedule", "credentials"].includes(what) && cloud.state().connected) {
+      if (pushTimer) clearTimeout(pushTimer);
+      pushTimer = setTimeout(() => void cloud.push().catch(() => {}), 2000);
+    }
+  };
 
   const handlers: Record<string, (a: any) => unknown | Promise<unknown>> = {
     // ---------- приложение ----------
@@ -178,7 +219,10 @@ export function createApi(repo: Repo, platform: Platform) {
         name: z.string().min(1).max(120), notes: z.string().max(5000).default(""), rules: RulesSchema,
         skills: z.array(z.object({ skill: z.string().min(1).max(120), kind: z.enum(["proven", "self_reported", "needs_example"]), evidence: z.string().max(2000).default(""), url: z.string().max(500).nullable().default(null) })).max(200).default([]),
       }).parse(a);
-      const c = repo.createCandidate({ name: p.name, rules: p.rules, notes: p.notes, note: "onboarding" });
+      const rules = normalizeInstructions(p.rules);
+      const open = unresolvedConflicts(rules);
+      if (open.length) throw new ApiError(msg(`Инструкции противоречат настройкам: ${open.map((c) => c.instruction.ru).join("; ")}. Выберите, что главнее.`, `Your instructions contradict the settings: ${open.map((c) => c.instruction.en).join("; ")}. Choose which one wins.`), "instruction_conflicts");
+      const c = repo.createCandidate({ name: p.name, rules, notes: p.notes, note: "onboarding" });
       for (const s of p.skills) repo.upsertSkill({ candidateId: c.id, ...s });
       repo.setMeta("active_candidate", c.id);
       assessAll(repo, { candidateIds: [c.id] });
@@ -207,10 +251,62 @@ export function createApi(repo: Repo, platform: Platform) {
     "profile.saveRules": (a) => {
       const p = z.object({ candidateId: id, rules: RulesSchema, note: z.string().max(300).default("") }).parse(a);
       needCandidate(p.candidateId);
-      const v = repo.saveRules(p.candidateId, p.rules, p.note);
+      const rules = normalizeInstructions(p.rules);
+      // Противоречие между инструкциями и настройками решает человек, а не случай
+      const open = unresolvedConflicts(rules);
+      if (open.length) throw new ApiError(msg(`Инструкции противоречат настройкам: ${open.map((c) => c.instruction.ru).join("; ")}. Выберите, что главнее.`, `Your instructions contradict the settings: ${open.map((c) => c.instruction.en).join("; ")}. Choose which one wins.`), "instruction_conflicts");
+      const v = repo.saveRules(p.candidateId, rules, p.note);
       const ch = assessAll(repo, { candidateIds: [p.candidateId] });
       changed("profile");
       return { version: v, reassessed: ch.length };
+    },
+    // ---------- дополнительные инструкции для ИИ ----------
+    "instructions.preview": async (a) => {
+      const p = z.object({ rules: RulesSchema, text: z.string().max(4000), useAi: z.boolean().default(true) }).parse(a);
+      const text = p.text.trim();
+      if (!text) return { parsed: null, parsedBy: null, conflicts: [], aiUsed: false, aiError: null };
+      let parsed = parseInstructions(text);
+      let parsedBy: "rules" | "rules+ai" = "rules";
+      let aiError: Msg | null = null;
+      if (p.useAi && transport()) {
+        try {
+          parsed = mergeDirectives(parsed, await ai.parseInstructions(text));
+          parsedBy = "rules+ai";
+        } catch (e) {
+          aiError = e instanceof AiError ? e.userMessage : msg(String((e as Error).message), String((e as Error).message));
+        }
+      }
+      const conflicts = findConflicts(p.rules, parsed);
+      return { parsed, parsedBy, parsedFor: text, parsedAt: new Date().toISOString(), conflicts, aiUsed: parsedBy === "rules+ai", aiError };
+    },
+    /** Проверка свободной части инструкций ИИ для подходящих и «уточнить» вакансий без проверки. */
+    "instructions.checkNotes": async (a) => {
+      const p = z.object({ limit: z.number().int().min(1).max(100).default(15) }).parse(a ?? {});
+      if (!transport()) return { checked: 0, skipped: "no_ai" };
+      let checked = 0;
+      const errors: string[] = [];
+      for (const c of repo.listCandidates()) {
+        const d = activeDirectives(repo.currentProfile(c.id).rules);
+        const nh = notesHash(d);
+        if (!d || !nh) continue;
+        const todo = repo.listVacanciesForCandidate(c.id).filter((v) => (v.fit === "suitable" || v.fit === "needs_check") && !repo.instructionCheck(c.id, v.id, nh)).slice(0, p.limit - checked);
+        for (const item of todo) {
+          const v = repo.getVacancy(item.id);
+          if (!v) continue;
+          try {
+            const r = await ai.checkInstructionNotes(d.notes, v, c.id);
+            repo.saveInstructionCheck({ candidateId: c.id, vacancyId: v.id, notesHash: nh, ...r });
+            checked++;
+          } catch (e) {
+            errors.push((e as Error).message);
+            break;
+          }
+        }
+        assessAll(repo, { candidateIds: [c.id] });
+        if (checked >= p.limit) break;
+      }
+      if (checked) changed("vacancies");
+      return { checked, errors };
     },
     "skills.upsert": (a) => {
       const p = z.object({ id: z.string().optional(), candidateId: id, skill: z.string().min(1).max(120), kind: z.enum(["proven", "self_reported", "needs_example"]), evidence: z.string().max(2000).default(""), url: z.string().max(500).nullable().default(null) }).parse(a);
@@ -357,14 +453,15 @@ export function createApi(repo: Repo, platform: Platform) {
       fs.mkdirSync(dir, { recursive: true });
       const target = path.join(dir, `${hash.slice(0, 12)}-${path.basename(file).replace(/[\r\n]/g, " ")}`);
       fs.copyFileSync(file, target);
-      const isText = /\.(txt|md)$/i.test(file);
-      const content = isText ? fs.readFileSync(file, "utf8").slice(0, 200000) : "";
+      // Текст извлекается из PDF/DOCX/TXT/HTML; скан без текста — честное сообщение про распознавание
+      const extraction = await extractText(target);
+      const content = extraction.text;
       const mv = repo.createMaterialVersion({
         materialId: p.materialId ?? null, candidateId: p.candidateId, kind: p.kind, title: p.title || path.basename(file), status: "draft", origin: "imported",
         content, filePath: target, fileHash: hash, fileAvailable: fs.existsSync(target),
       });
       changed("materials");
-      return mv;
+      return { ...mv, extraction: { status: extraction.status, pages: extraction.pages, message: extraction.message } };
     },
     "materials.createDraft": async (a) => {
       const p = z.object({ candidateId: id, vacancyId: z.string().nullable().default(null), kind: z.enum(["cv", "letter"]), lang: z.enum(["ru", "en"]), mode: z.enum(["template", "ai"]) }).parse(a);
@@ -455,13 +552,14 @@ export function createApi(repo: Repo, platform: Platform) {
       return { ok: true };
     },
     "materials.export": async (a) => {
-      const p = z.object({ candidateId: id, id, format: z.enum(["md", "txt", "html", "pdf"]) }).parse(a);
+      const p = z.object({ candidateId: id, id, format: z.enum(["md", "txt", "html", "pdf", "docx"]) }).parse(a);
       const m = repo.getMaterialVersion(p.id);
       if (!m || m.candidateId !== p.candidateId) throw new ApiError(msg("Документ не найден", "Document not found"));
       const target = await platform.saveFile({ title: lang() === "ru" ? "Сохранить документ" : "Save document", defaultPath: materialFileName(m, p.format), filters: [{ name: p.format.toUpperCase(), extensions: [p.format] }] });
       if (!target) return { cancelled: true };
       const html = textToHtml(m.title, m.content, lang());
       if (p.format === "pdf") fs.writeFileSync(target, await platform.printToPdf(html));
+      else if (p.format === "docx") fs.writeFileSync(target, await toDocx(m.title, m.content));
       else if (p.format === "html") fs.writeFileSync(target, html, "utf8");
       else fs.writeFileSync(target, m.content.replace(/\r?\n/g, platform.platform === "win32" ? "\r\n" : "\n"), "utf8");
       return { path: target };
@@ -505,6 +603,118 @@ export function createApi(repo: Repo, platform: Platform) {
         return { ok: false, message: msg(`Ошибка: ${(e as Error).message}`, `Error: ${(e as Error).message}`) };
       }
     },
+    // ---------- доступы к источникам (hh.ru, Adzuna) ----------
+    "credentials.get": () => creds.state(),
+    "credentials.hh.saveClient": (a) => {
+      const p = z.object({ clientId: z.string().min(4).max(200), clientSecret: z.string().max(400).optional(), redirectUri: z.string().url().max(300).optional() }).parse(a);
+      try {
+        creds.saveHhClient(p);
+      } catch (e) {
+        throw new ApiError(msg(`Не сохранено: ${(e as Error).message}`, `Not saved: ${(e as Error).message}`));
+      }
+      changed("credentials");
+      return creds.state();
+    },
+    "credentials.hh.connectUser": async () => {
+      try {
+        await creds.connectHhUser((url) => platform.openExternal(url));
+      } catch (e) {
+        throw new ApiError(msg(`Вход в hh.ru не выполнен: ${(e as Error).message}`, `hh.ru sign-in failed: ${(e as Error).message}`));
+      }
+      const check = await creds.testHh();
+      changed("credentials");
+      return { state: creds.state(), check };
+    },
+    "credentials.hh.connectApp": async () => {
+      try {
+        await creds.connectHhApp();
+      } catch (e) {
+        throw new ApiError(msg(`Токен приложения не получен: ${(e as Error).message}`, `Application token not issued: ${(e as Error).message}`));
+      }
+      const check = await creds.testHh();
+      changed("credentials");
+      return { state: creds.state(), check };
+    },
+    "credentials.hh.setToken": async (a) => {
+      const p = z.object({ token: z.string().min(10).max(2000) }).parse(a);
+      try {
+        creds.setHhManualToken(p.token);
+      } catch (e) {
+        throw new ApiError(msg(`Не сохранено: ${(e as Error).message}`, `Not saved: ${(e as Error).message}`));
+      }
+      const check = await creds.testHh();
+      changed("credentials");
+      return { state: creds.state(), check };
+    },
+    "credentials.hh.test": async () => ({ state: creds.state(), check: await creds.testHh() }),
+    "credentials.hh.disconnect": () => {
+      creds.disconnectHh();
+      changed("credentials");
+      return creds.state();
+    },
+    "credentials.adzuna.save": async (a) => {
+      const p = z.object({ appId: z.string().min(3).max(100), appKey: z.string().max(200).optional() }).parse(a);
+      try {
+        creds.saveAdzuna(p);
+      } catch (e) {
+        throw new ApiError(msg(`Не сохранено: ${(e as Error).message}`, `Not saved: ${(e as Error).message}`));
+      }
+      const check = await creds.testAdzuna();
+      changed("credentials");
+      return { state: creds.state(), check };
+    },
+    "credentials.adzuna.clear": () => {
+      creds.clearAdzuna();
+      changed("credentials");
+      return creds.state();
+    },
+    // ---------- сервер поиска (когда компьютер выключен) ----------
+    "cloud.get": () => cloud?.state() ?? null,
+    "cloud.connect": async (a) => {
+      const p = z.object({ url: z.string().url().max(300), shareCredentials: z.boolean().default(false) }).parse(a);
+      if (!cloud) throw new ApiError(msg("Недоступно", "Unavailable"));
+      try {
+        return await cloud.connect(p.url, p.shareCredentials);
+      } catch (e) {
+        throw new ApiError(msg(`Не подключено: ${(e as Error).message}`, `Not connected: ${(e as Error).message}`));
+      }
+    },
+    "cloud.setShare": async (a) => {
+      const p = z.object({ shareCredentials: z.boolean() }).parse(a);
+      cloud?.setShareCredentials(p.shareCredentials);
+      await cloud?.push().catch(() => {});
+      return cloud?.state() ?? null;
+    },
+    "cloud.push": async () => {
+      try {
+        await cloud?.push();
+      } catch (e) {
+        throw new ApiError(msg(`Не отправлено: ${(e as Error).message}`, `Not sent: ${(e as Error).message}`));
+      }
+      return cloud?.state() ?? null;
+    },
+    "cloud.pull": async () => {
+      try {
+        const r = await cloud?.pull();
+        changed("vacancies");
+        return { result: r, state: cloud?.state() ?? null };
+      } catch (e) {
+        throw new ApiError(msg(`Результаты не получены: ${(e as Error).message}`, `Results not received: ${(e as Error).message}`));
+      }
+    },
+    "cloud.runNow": async () => {
+      try {
+        await cloud?.runNow();
+      } catch (e) {
+        throw new ApiError(msg(`Не запущено: ${(e as Error).message}`, `Not started: ${(e as Error).message}`));
+      }
+      return cloud?.state() ?? null;
+    },
+    "cloud.disconnect": async (a) => {
+      const p = z.object({ deleteRemote: z.boolean().default(true) }).parse(a ?? {});
+      await cloud?.disconnect(p.deleteRemote);
+      return cloud?.state() ?? null;
+    },
     "excluded.list": () => repo.listExcludedHosts(),
     "excluded.add": (a) => {
       const p = z.object({ host: z.string().regex(/^[a-z0-9.-]{3,120}$/i), reason: z.string().max(200).default("") }).parse(a);
@@ -514,7 +724,7 @@ export function createApi(repo: Repo, platform: Platform) {
     },
     "excluded.remove": (a) => {
       const ok = repo.removeExcludedHost(z.string().max(120).parse(a?.host));
-      if (!ok) throw new ApiError(msg("Встроенное правило нельзя удалить", "A built-in rule cannot be removed"));
+      if (!ok) throw new ApiError(msg("Такого исключения нет", "No such exclusion"));
       changed("excluded");
       return { ok };
     },
@@ -523,12 +733,15 @@ export function createApi(repo: Repo, platform: Platform) {
     "schedule.get": () => {
       const s = schedule();
       const st = repo.getMeta<ScheduleState>("schedule_state", { lastHandledSlot: null, lastRunId: null });
-      return { settings: s, state: st, next: s.enabled && !s.paused ? nextSlot(s, new Date()).toISOString() : null, events: repo.listScheduleEvents(20) };
+      return { settings: s, state: st, next: s.enabled && !s.paused ? nextSlot(s, new Date()).toISOString() : null, events: repo.listScheduleEvents(20), osTask: repo.getMeta("os_task_status", null) };
     },
     "schedule.update": (a) => {
-      const p = z.object({ enabled: z.boolean(), paused: z.boolean(), cadence: z.enum(["daily", "weekly"]), time: hhmm, weekday: z.number().int().min(1).max(7), runInBackground: z.boolean() }).parse(a);
+      const p = z.object({
+        enabled: z.boolean(), paused: z.boolean(), cadence: z.enum(["daily", "weekly"]), time: hhmm, weekday: z.number().int().min(1).max(7), runInBackground: z.boolean(),
+        timezone: z.string().refine(isValidZone, "invalid timezone").optional(), osTask: z.boolean().optional(),
+      }).parse(a);
       const prev = schedule();
-      repo.setMeta("schedule", p);
+      repo.setMeta("schedule", { ...p, timezone: p.timezone || prev.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone, osTask: p.osTask ?? prev.osTask ?? true });
       if (prev.enabled !== p.enabled) repo.addScheduleEvent(p.enabled ? "enabled" : "disabled", null);
       if (prev.paused !== p.paused) repo.addScheduleEvent(p.paused ? "paused" : "resumed", null);
       if (!prev.enabled && p.enabled) repo.setMeta("schedule_state", { lastHandledSlot: null, lastRunId: null });

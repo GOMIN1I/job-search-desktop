@@ -84,7 +84,7 @@ function Shell({ info, setInfo, setLang }: { info: AppInfo | null; setInfo: (i: 
               if (l.id !== pr.sourceId) return l;
               if (!pr.status) return { ...l, state: "active" };
               const st = pr.status as string;
-              const state: Lane["state"] = st === "success" || st === "partial" ? "done" : st === "not_due" || st === "disabled" || st === "not_configured" ? "skip" : st === "cancelled" ? "wait" : "fail";
+              const state: Lane["state"] = st === "success" || st === "partial" ? "done" : st === "not_due" || st === "disabled" || st === "excluded" || st === "not_configured" ? "skip" : st === "cancelled" ? "wait" : "fail";
               return { ...l, state, status: st, items: pr.items ?? l.items };
             });
           }

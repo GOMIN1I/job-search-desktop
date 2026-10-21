@@ -1,0 +1,25 @@
+# Fly.io: fly launch --config server/fly.toml --dockerfile server/Dockerfile (из корня репозитория)
+app = "jsd-search-server"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  DATA_DIR = "/data"
+  PORT = "8787"
+
+[mounts]
+  source = "jsd_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+[[http_service.checks]]
+  path = "/health"
+  interval = "30s"
+  timeout = "5s"

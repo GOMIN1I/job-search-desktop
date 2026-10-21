@@ -14,8 +14,9 @@ import { judgePay } from "./money";
 import { normalizeText, phraseHit, sha } from "./text";
 import { convertWindow, formatInZone, windowFits } from "./timezone";
 import { isIntermediary } from "./classify";
+import { activeDirectives, checkInstructions, effectiveRules } from "./instructions";
 
-export const RULES_VERSION = "decision-2026.10.21";
+export const RULES_VERSION = "decision-2026.10.22";
 
 const LANG_NAMES: Record<string, Msg> = {
   en: msg("английский", "English"), ru: msg("русский", "Russian"), de: msg("немецкий", "German"), fr: msg("французский", "French"),
@@ -34,6 +35,7 @@ const L = {
   safety: msg("Работодатель", "Employer"),
   postingType: msg("Тип объявления", "Posting type"),
   exclusions: msg("Исключённые темы", "Excluded topics"),
+  instructions: msg("Ваши инструкции", "Your instructions"),
   skills: msg("Навыки", "Skills"),
   freshness: msg("Свежесть", "Freshness"),
 };
@@ -83,6 +85,8 @@ export interface AssessInput {
   vacancy: Vacancy;
   candidateId: string;
   now?: Date;
+  /** Проверка свободной части инструкций моделью ИИ (если была). */
+  instructionNote?: { status: DimensionStatus; reason: Msg; quote: string | null } | null;
 }
 
 export function assessmentInputHash(input: AssessInput): string {
@@ -95,12 +99,15 @@ export function assessmentInputHash(input: AssessInput): string {
       input.vacancy.contentHash,
       input.vacancy.facts,
       input.vacancy.postingKind,
+      input.instructionNote ?? null,
     ]),
   );
 }
 
 export function assess(input: AssessInput): Omit<Assessment, "id" | "createdAt" | "supersededAt"> {
-  const { rules, vacancy: v } = input;
+  const { vacancy: v } = input;
+  // Решения человека по противоречиям с инструкциями меняют настройки профиля
+  const rules = effectiveRules(input.rules);
   const now = input.now ?? new Date();
   const f = v.facts;
   const dims: Dimension[] = [];
@@ -319,6 +326,22 @@ export function assess(input: AssessInput): Omit<Assessment, "id" | "createdAt" 
     const body = normalizeText(`${v.title} ${v.company} ${v.description.slice(0, 8000)}`);
     const hit = rules.excludedKeywords.filter((k) => phraseHit(body, k));
     if (hit.length) dims.push(dim("exclusions", L.exclusions, "fail", "hard", msg(`Найдено: ${hit.join(", ")}`, `Found: ${hit.join(", ")}`)));
+  }
+
+  // 10б. Дополнительные инструкции для ИИ (свои слова человека)
+  {
+    const d = activeDirectives(rules);
+    if (d) {
+      const structured = d.excludeSources.length + d.excludeHosts.length + d.excludeKeywords.length + d.requireKeywords.length + d.countries.length + d.excludeCountries.length + d.postingLanguages.length > 0;
+      const verdict = checkInstructions(d, v, input.instructionNote);
+      const notesOnly = !structured && d.notes.length > 0;
+      if (structured || input.instructionNote || notesOnly) {
+        const reason = notesOnly && !input.instructionNote
+          ? msg("Часть инструкций сформулирована свободно — её проверяет ИИ (подключите модель в настройках)", "Part of your instructions is free-form — the AI checks it (connect a model in Settings)")
+          : verdict.reason;
+        dims.push(dim("instructions", L.instructions, notesOnly && !input.instructionNote ? "unknown" : verdict.status, structured ? "hard" : "soft", reason, verdict.quote ? { evidence: { quote: verdict.quote, source: v.canonicalUrl, status: "stated" as FactStatus } } : {}));
+      }
+    }
   }
 
   // 11. Навыки (желательные не превращаются в обязательные; «со слов» ≠ подтверждено)

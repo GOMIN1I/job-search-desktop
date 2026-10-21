@@ -151,6 +151,22 @@ CREATE TABLE import_batches (
 CREATE TABLE app_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, level TEXT NOT NULL, area TEXT NOT NULL, message TEXT NOT NULL);
 `,
   },
+  {
+    version: 2,
+    name: "instruction checks, cloud sync",
+    sql: `
+CREATE TABLE instruction_checks (
+  candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+  vacancy_id TEXT NOT NULL REFERENCES vacancies(id) ON DELETE CASCADE,
+  notes_hash TEXT NOT NULL,
+  status TEXT NOT NULL,
+  reason_json TEXT NOT NULL,
+  quote TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (candidate_id, vacancy_id, notes_hash)
+);
+`,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

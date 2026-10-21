@@ -2,7 +2,7 @@ import type { SearchRules, Vacancy } from "../src/shared/types";
 import { emptyRules, ROLE_TEMPLATES, trackFromTemplate } from "../src/core/templates";
 import { normalizeRaw } from "../src/pipeline/normalize";
 import type { RawJob } from "../src/sources/adapters";
-import { DEFAULT_EXCLUDED_HOSTS } from "../src/core/policy";
+import { DEFAULT_EXCLUDED_HOSTS, type ExcludedHost } from "../src/core/policy";
 
 export const NOW = new Date("2026-10-21T08:00:00Z");
 
@@ -25,8 +25,8 @@ export function raw(p: Partial<RawJob> & { title: string; description: string })
   };
 }
 
-export function vac(p: Partial<RawJob> & { title: string; description: string }): Vacancy {
-  const r = normalizeRaw(raw(p), DEFAULT_EXCLUDED_HOSTS, NOW);
+export function vac(p: Partial<RawJob> & { title: string; description: string }, excluded: ExcludedHost[] = DEFAULT_EXCLUDED_HOSTS): Vacancy {
+  const r = normalizeRaw(raw(p), excluded, NOW);
   if (!r.ok) throw new Error(`normalize failed: ${r.detail}`);
   return r.vacancy;
 }

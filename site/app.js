@@ -1,8 +1,6 @@
 // Сайт: определение системы для кнопки скачивания, живое объявление, язык, автозапуск демо при прокрутке.
 (function () {
   "use strict";
-  var REL = "https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/";
-  var FILES = { mac: REL + "Job-Search-Desktop-mac-arm64.dmg", win: REL + "Job-Search-Desktop-windows-x64-setup.exe" };
   // Язык: сохранённый выбор, иначе язык браузера (русский и близкие — RU, остальные — EN)
   var saved = null;
   try { saved = localStorage.getItem("jsd-site-lang"); } catch (e) { /* хранилище недоступно */ }
@@ -17,18 +15,17 @@
     return null;
   }
   var os = detectOS();
-  var labels = {
-    ru: { mac: "Скачать для macOS", win: "Скачать для Windows", other: "Скачать" },
-    en: { mac: "Download for macOS", win: "Download for Windows", other: "Download" },
-  };
+  // Обе кнопки всегда видны и одинакового размера; подходящая системе посетителя только выделяется заливкой
   function applyOS() {
-    var primary = document.getElementById("dl-primary");
-    var label = document.getElementById("dl-primary-label");
-    var chosen = os || "mac";
-    primary.href = FILES[chosen];
-    label.textContent = labels[lang][os ? chosen : "other"];
-    document.getElementById("dl-mac").setAttribute("aria-current", chosen === "mac" ? "true" : "false");
-    document.getElementById("dl-win").setAttribute("aria-current", chosen === "win" ? "true" : "false");
+    document.querySelectorAll(".btn-dl").forEach(function (b) {
+      var match = os && b.getAttribute("data-os") === os;
+      b.classList.toggle("is-detected", !!match);
+      if (match) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+    });
+    document.querySelectorAll("[data-en-label]").forEach(function (g) {
+      if (!g.hasAttribute("data-ru-label")) g.setAttribute("data-ru-label", g.getAttribute("aria-label"));
+      g.setAttribute("aria-label", lang === "en" ? g.getAttribute("data-en-label") : g.getAttribute("data-ru-label"));
+    });
   }
 
   // --- живое объявление ---
@@ -120,10 +117,6 @@
       lang = lang === "en" ? "ru" : "en";
       try { localStorage.setItem("jsd-site-lang", lang); } catch (e) { /* без сохранения */ }
       applyLang();
-    });
-    document.getElementById("dl-final").addEventListener("click", function (e) {
-      e.preventDefault();
-      window.location.href = FILES[os || "mac"];
     });
     wireMarks();
     wireDemos();

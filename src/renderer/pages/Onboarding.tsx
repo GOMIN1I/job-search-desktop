@@ -2,11 +2,12 @@
 // Знакомство → о вас → что ищете → где искать → помощник (локальная модель) → первый поиск и объяснение.
 // Заполненное сохраняется автоматически; шаги можно пройти назад и пропустить необязательные.
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Candidate, Cefr, SearchRules, SourceInfo } from "../../shared/types";
+import type { AiInstructions, Candidate, Cefr, SearchRules, SourceInfo } from "../../shared/types";
 import { useI18n, type TKey } from "../i18n";
 import { call } from "../api";
 import { useApp } from "../state";
 import { RulesEditor, useTemplates } from "../components/RulesEditor";
+import { AiInstructionsEditor } from "../components/AiInstructions";
 import { BrandMark, FitBadge, Icon, useBusy, useToast } from "../components/ui";
 import { LocalModels } from "../components/LocalModels";
 import { RunPanel } from "../components/RunPanel";
@@ -36,6 +37,8 @@ interface Draft {
   noCalls: boolean;
   entryOnly: boolean;
   advanced: SearchRules | null;
+  instructions?: AiInstructions;
+  instrOpen?: number;
 }
 
 const emptyDraft = (lang: "ru" | "en"): Draft => ({
@@ -126,6 +129,7 @@ export function Onboarding() {
       languages: { mode: langs.length ? "hard" : "unset", items: langs },
       voice: { mode: d.noCalls ? "hard" : "unset", noPhoneWork: d.noCalls, noVoiceScreening: false },
       experience: { mode: d.entryOnly ? "hard" : "unset", maxYearsRequired: 1, allowSenior: false },
+      aiInstructions: d.instructions,
     };
   }, [d, defaults, tpls, lang]);
 
@@ -304,6 +308,11 @@ export function Onboarding() {
                   <label className="check"><input type="checkbox" checked={d.noCalls} onChange={(e) => set({ noCalls: e.target.checked })} />{t("ob2.wishes.noCalls")}</label>
                   <label className="check"><input type="checkbox" checked={d.entryOnly} onChange={(e) => set({ entryOnly: e.target.checked })} />{t("ob2.wishes.experience")}</label>
                 </div>
+                <div className="field">
+                  <label>{lang === "ru" ? "Дополнительные инструкции для ИИ (по желанию)" : "Additional instructions for AI (optional)"}</label>
+                  <p className="why">{lang === "ru" ? "Своими словами: какие площадки не использовать, какие страны и языки рассматривать, чего избегать. Применяется в каждом поиске." : "In your own words: which sites not to use, which countries and languages to consider, what to avoid. Applied on every search."}</p>
+                  {rules && <AiInstructionsEditor rules={rules} value={d.instructions} aiConnected={false} onChange={(v, o) => set({ instructions: v, instrOpen: o })} />}
+                </div>
                 <details className="more">
                   <summary>{t("ob2.wishes.more")}</summary>
                   <div>{rules && <RulesEditor rules={rules} onChange={(r) => set({ advanced: r })} sections={["hours", "languages", "limits"]} />}</div>
@@ -369,7 +378,7 @@ export function Onboarding() {
             {(d.step === "sources" || d.step === "ai") && <button className="btn btn-ghost" onClick={() => go(STEPS[idx + 1])}>{t("ob2.skip")}</button>}
             {d.step === "intro" && <button className="btn btn-primary btn-lg" onClick={() => go("about")}>{t("ob.start")}</button>}
             {d.step === "about" && <button className="btn btn-primary" disabled={!canNext} onClick={() => go("wishes")}>{t("ob2.next")}</button>}
-            {d.step === "wishes" && <button className="btn btn-primary" disabled={!d.name.trim() || busy === "save"} onClick={saveCandidate}>{t("ob2.create")}</button>}
+            {d.step === "wishes" && <button className="btn btn-primary" disabled={!d.name.trim() || busy === "save" || (d.instrOpen ?? 0) > 0} onClick={saveCandidate}>{t("ob2.create")}</button>}
             {(d.step === "sources" || d.step === "ai") && <button className="btn btn-primary" onClick={() => go(STEPS[idx + 1])}>{t("ob2.next")}</button>}
             {d.step === "search" && !results && <button className="btn btn-ghost" onClick={() => void finish(false)}>{t("ob2.search.skip")}</button>}
             {d.step === "search" && results && <button className="btn btn-primary btn-lg" onClick={() => void finish(true)}><Icon.list className="nav-icon" />{t("ob2.search.open")}</button>}

@@ -15,3 +15,5 @@ await build({ ...common, entryPoints: ["src/main/main.ts"], outfile: "dist/main/
 await build({ ...common, entryPoints: ["src/main/worker.ts"], outfile: "dist/main/worker.js" });
 await build({ ...common, entryPoints: ["src/main/preload.ts"], outfile: "dist/main/preload.js" });
 await build({ ...common, entryPoints: ["src/cli/cli.ts"], outfile: "dist/cli.js" });
+// Сервер поиска (для поиска, когда компьютер выключен) — тот же код ядра
+await build({ ...common, external: [], entryPoints: ["server/src/server.ts"], outfile: "server/dist/server.js" });

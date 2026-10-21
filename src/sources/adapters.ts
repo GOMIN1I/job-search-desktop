@@ -5,6 +5,7 @@ import type { Coverage, Msg, SourceKind } from "../shared/types";
 import { msg } from "../shared/types";
 import { decodeEntities, htmlToText, oneLine } from "../core/text";
 import { httpGet, type FetchOptions, type Fetcher } from "./http";
+import { ADZUNA_COUNTRIES, HH_AREAS, parseAdzuna, parseArbeitnow, parseHh, parseMuse } from "./search";
 
 export interface RawJob {
   sourceId: string;
@@ -35,18 +36,22 @@ export interface SourceDefinition {
   termsNote: Msg;
   attribution: string;
   enabledByDefault: boolean;
+  /** Нужен доступ, который вводит пользователь (токен hh.ru, ключ Adzuna). Без него источник «не настроен». */
+  needsCredentials?: "hh" | "adzuna";
+  /** Ищет по запросам из профиля (а не только читает ленту). */
+  searchesByQuery?: boolean;
 }
 
 export const SOURCE_DEFINITIONS: SourceDefinition[] = [
   {
-    id: "jobicy", kind: "jobicy", label: "Jobicy", homepage: "https://jobicy.com", minIntervalMinutes: 360, maxPages: 1, enabledByDefault: true,
-    coverageNote: msg("Удалённые вакансии за последние 7 дней; до 100 за проход (одна страница из нескольких)", "Remote jobs from the last 7 days; up to 100 per pass (one page of several)"),
+    id: "jobicy", kind: "jobicy", label: "Jobicy", homepage: "https://jobicy.com", minIntervalMinutes: 360, maxPages: 4, enabledByDefault: true, searchesByQuery: true,
+    coverageNote: msg("Общая лента (до 100) и поиск по тегам ваших направлений, до 50 на запрос", "General feed (up to 100) plus search by tags of your job areas, up to 50 per query"),
     termsNote: msg("Автоматический проход не чаще раза в час; указывать Jobicy и ссылку на исходную карточку", "Automated pass at most hourly; credit Jobicy and link to the original posting"),
     attribution: "Jobicy",
   },
   {
-    id: "remotive", kind: "remotive", label: "Remotive", homepage: "https://remotive.com", minIntervalMinutes: 360, maxPages: 1, enabledByDefault: true,
-    coverageNote: msg("Публичный API с задержкой 24 ч; лимит 300 записей", "Public API delayed by 24 h; capped at 300 records"),
+    id: "remotive", kind: "remotive", label: "Remotive", homepage: "https://remotive.com", minIntervalMinutes: 360, maxPages: 2, enabledByDefault: true, searchesByQuery: true,
+    coverageNote: msg("Вся публичная выдача (до 300) и поиск по вашим направлениям; задержка API 24 ч", "The whole public listing (up to 300) plus search by your job areas; API delay 24 h"),
     termsNote: msg("Не чаще 4 раз в сутки (>2 запросов/мин блокируются); ссылка на Remotive обязательна", "At most 4 times per day (>2 requests/min are blocked); link back to Remotive"),
     attribution: "Remotive",
   },
@@ -57,8 +62,8 @@ export const SOURCE_DEFINITIONS: SourceDefinition[] = [
     attribution: "Remote OK",
   },
   {
-    id: "himalayas", kind: "himalayas", label: "Himalayas", homepage: "https://himalayas.app", minIntervalMinutes: 1440, maxPages: 3, enabledByDefault: true,
-    coverageNote: msg("По 20 на страницу (максимум API), cursor-пагинация; за проход 3 страницы из ~6 000+; данные обновляются раз в 24 ч", "20 per page (API maximum), cursor pagination; 3 pages per pass out of 6,000+; data refreshes every 24 h"),
+    id: "himalayas", kind: "himalayas", label: "Himalayas", homepage: "https://himalayas.app", minIntervalMinutes: 1440, maxPages: 24, enabledByDefault: true, searchesByQuery: true,
+    coverageNote: msg("Поиск по всей базе (20 на страницу, несколько страниц на каждое направление) и свежие объявления ленты", "Search across the whole database (20 per page, several pages per job area) plus the newest feed items"),
     termsNote: msg("Видимая атрибуция Himalayas; кнопка отклика ведёт на applicationLink; не передавать в другие доски", "Visible Himalayas credit; Apply uses applicationLink; do not redistribute to other boards"),
     attribution: "Himalayas",
   },
@@ -75,10 +80,34 @@ export const SOURCE_DEFINITIONS: SourceDefinition[] = [
     attribution: "We Work Remotely",
   },
   {
-    id: "habrcareer", kind: "habrcareer", label: "Хабр Карьера", homepage: "https://career.habr.com", minIntervalMinutes: 720, maxPages: 2, enabledByDefault: true,
-    coverageNote: msg("RSS новых вакансий, 2 страницы (фактически ~50 на страницу); краткое описание, полный текст — на карточке", "RSS of new vacancies, 2 pages (about 50 per page in practice); short summary, full text on the posting"),
+    id: "habrcareer", kind: "habrcareer", label: "Хабр Карьера", homepage: "https://career.habr.com", minIntervalMinutes: 720, maxPages: 10, enabledByDefault: true, searchesByQuery: true,
+    coverageNote: msg("RSS новых вакансий и поиск по вашим направлениям; краткое описание, полный текст — на карточке", "RSS of new vacancies plus search by your job areas; short summary, full text on the posting"),
     termsNote: msg("Публичный RSS Хабр Карьеры; ссылка на исходную карточку", "Public Habr Career RSS; link to the original posting"),
     attribution: "Хабр Карьера",
+  },
+  {
+    id: "hh", kind: "hh", label: "hh.ru", homepage: "https://hh.ru", minIntervalMinutes: 360, maxPages: 20, enabledByDefault: false, searchesByQuery: true, needsCredentials: "hh",
+    coverageNote: msg("Официальный API hh.ru: поиск по вашим направлениям и стране, до 100 на страницу, глубина до 2000 на запрос", "Official hh.ru API: search by your job areas and country, up to 100 per page, up to 2,000 per query"),
+    termsNote: msg("С апреля 2026 hh.ru отдаёт поиск только с OAuth-токеном: подключите аккаунт или токен приложения в настройках источника", "Since April 2026 hh.ru serves search only with an OAuth token: connect an account or an application token in the source settings"),
+    attribution: "hh.ru",
+  },
+  {
+    id: "adzuna", kind: "adzuna", label: "Adzuna", homepage: "https://www.adzuna.com", minIntervalMinutes: 360, maxPages: 10, enabledByDefault: false, searchesByQuery: true, needsCredentials: "adzuna",
+    coverageNote: msg("Поиск по 19 странам (Европа, США, Канада, Австралия, Индия и др.), 50 на страницу", "Search in 19 countries (Europe, US, Canada, Australia, India and more), 50 per page"),
+    termsNote: msg("Нужен бесплатный ключ разработчика Adzuna (app_id и app_key); ссылка на Adzuna обязательна", "Needs a free Adzuna developer key (app_id and app_key); link back to Adzuna"),
+    attribution: "Adzuna",
+  },
+  {
+    id: "themuse", kind: "themuse", label: "The Muse", homepage: "https://www.themuse.com", minIntervalMinutes: 720, maxPages: 10, enabledByDefault: true,
+    coverageNote: msg("Публичный API: категории, близкие к вашим направлениям, 20 на страницу, несколько страниц", "Public API: categories close to your job areas, 20 per page, several pages"),
+    termsNote: msg("Без ключа до 500 запросов в час; ссылка на карточку The Muse", "Without a key up to 500 requests per hour; link to The Muse posting"),
+    attribution: "The Muse",
+  },
+  {
+    id: "arbeitnow", kind: "arbeitnow", label: "Arbeitnow", homepage: "https://www.arbeitnow.com", minIntervalMinutes: 720, maxPages: 3, enabledByDefault: true,
+    coverageNote: msg("Европа и удалённая работа: до 300 на страницу, несколько страниц по дате", "Europe and remote jobs: up to 300 per page, several pages by date"),
+    termsNote: msg("Бесплатный публичный API, без злоупотреблений; ссылка на Arbeitnow", "Free public API, no abuse; link back to Arbeitnow"),
+    attribution: "Arbeitnow",
   },
   {
     id: "ats", kind: "ats", label: "Компании (Greenhouse / Lever / Ashby)", homepage: "", minIntervalMinutes: 1440, maxPages: 25, enabledByDefault: true,
@@ -102,6 +131,11 @@ export interface CollectContext {
   maxPages: number;
   companies?: Array<{ name: string; atsKind: string; atsSlug: string }>;
   pauseMs?: number;
+  /** Поисковые фразы из направлений профилей. */
+  queries?: string[];
+  /** Страны людей (ISO alpha-2) — для источников с поиском по стране. */
+  countries?: string[];
+  credentials?: { hhToken?: string | null; adzuna?: { appId: string; appKey: string } | null };
 }
 
 const arr = <T>(v: T | T[] | null | undefined): T[] => (Array.isArray(v) ? v : v === null || v === undefined || (v as unknown) === "" ? [] : [v]);
@@ -424,18 +458,75 @@ export async function collect(def: SourceDefinition, ctx: CollectContext): Promi
   };
   const pages = Math.max(1, Math.min(def.maxPages, ctx.maxPages));
   const win = (ru: string, en: string) => msg(ru, en);
+  const queries = (ctx.queries ?? []).filter(Boolean);
+  // Обход «запрос × страницы» в пределах бюджета страниц: дубли внутри источника отбрасываются, сбой одной страницы не теряет остальное.
+  const paged = async (
+    pageBudget: number,
+    jobs: Array<{ label: string; fetchPage: (page: number) => Promise<{ items: RawJob[]; more: boolean; status: number }> }>,
+    perPage: number | null,
+    window: Msg,
+  ): Promise<CollectResult> => {
+    const items: RawJob[] = [];
+    const seen = new Set<string>();
+    let fetched = 0;
+    let status: number | null = null;
+    const errors: string[] = [];
+    let budget = pageBudget;
+    let allExhausted = true;
+    const perJob = Math.max(1, Math.floor(pageBudget / Math.max(1, jobs.length)));
+    for (const job of jobs) {
+      let page = 0;
+      while (budget > 0 && page < perJob) {
+        try {
+          const r = await job.fetchPage(page);
+          status = r.status;
+          fetched++;
+          budget--;
+          for (const it of r.items) {
+            const key = it.sourceJobId ?? it.url;
+            if (key && seen.has(key)) continue;
+            if (key) seen.add(key);
+            items.push(it);
+          }
+          page++;
+          if (!r.more || !r.items.length) break;
+          if (page >= perJob) allExhausted = false;
+          await wait(ctx.pauseMs ?? 1200, ctx.fetchOpts.signal);
+        } catch (e) {
+          if (ctx.fetchOpts.signal?.aborted) throw e;
+          const st = (e as { httpStatus?: number }).httpStatus;
+          if (fetched === 0 && jobs.length === 1) throw e;
+          if (st === 401 || st === 403) throw e;
+          errors.push(`${job.label}: ${(e as Error).message}`);
+          allExhausted = false;
+          break;
+        }
+      }
+    }
+    if (!fetched && errors.length) throw new Error(errors.join("; "));
+    return { items, httpStatus: status, partialError: errors.length ? errors.join("; ") : null, coverage: { pagesRequested: pageBudget, pagesFetched: fetched, perPageLimit: perPage, itemsReturned: items.length, exhausted: allExhausted, window } };
+  };
+  const json = async (url: string, label: string) => {
+    const r = await get(url);
+    ensureOk(r.status, label);
+    return { data: jsonOf(r.text, label) as any, status: r.status };
+  };
   switch (def.kind) {
     case "jobicy": {
-      const r = await get("https://jobicy.com/api/jobs?count=100");
-      ensureOk(r.status, def.label);
-      const p = parseJobicy(jsonOf(r.text, def.label));
-      return { items: p.items, httpStatus: r.status, partialError: null, coverage: { pagesRequested: 1, pagesFetched: 1, perPageLimit: 100, itemsReturned: p.items.length, exhausted: !p.next, window: win("последние 7 дней", "last 7 days") } };
+      // Общая лента + поиск по тегам направлений (параметр tag)
+      const jobs = [{ label: "feed", fetchPage: async () => { const r = await json("https://jobicy.com/api/v2/remote-jobs?count=100", def.label); return { items: parseJobicy(r.data).items, more: false, status: r.status }; } },
+        ...queries.slice(0, Math.max(0, pages - 1)).map((q) => ({ label: q, fetchPage: async () => { const r = await json(`https://jobicy.com/api/v2/remote-jobs?count=50&tag=${encodeURIComponent(q)}`, def.label); return { items: parseJobicy(r.data).items, more: false, status: r.status }; } }))];
+      return paged(jobs.length, jobs, 100, win("последние 7 дней и поиск по тегам", "last 7 days plus tag search"));
     }
     case "remotive": {
-      const r = await get("https://remotive.com/api/remote-jobs?limit=300");
-      ensureOk(r.status, def.label);
-      const items = parseRemotive(jsonOf(r.text, def.label));
-      return { items, httpStatus: r.status, partialError: null, coverage: { pagesRequested: 1, pagesFetched: 1, perPageLimit: 300, itemsReturned: items.length, exhausted: items.length < 300, window: win("задержка 24 ч", "24 h delay") } };
+      // Remotive: не больше 2 запросов в минуту — между запросами пауза 35 с; общая выдача + один поисковый запрос на проход
+      const jobs = [{ label: "all", fetchPage: async () => { const r = await json("https://remotive.com/api/remote-jobs?limit=300", def.label); return { items: parseRemotive(r.data), more: false, status: r.status }; } },
+        ...queries.slice(0, Math.max(0, pages - 1)).map((q) => ({ label: q, fetchPage: async () => {
+          await wait(ctx.pauseMs ?? 35_000, ctx.fetchOpts.signal);
+          const r = await json(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(q)}&limit=100`, def.label);
+          return { items: parseRemotive(r.data), more: false, status: r.status };
+        } }))];
+      return paged(jobs.length, jobs, 300, win("вся публичная выдача и поиск, задержка 24 ч", "whole public listing plus search, 24 h delay"));
     }
     case "remoteok": {
       const r = await get("https://remoteok.com/api");
@@ -456,57 +547,88 @@ export async function collect(def: SourceDefinition, ctx: CollectContext): Promi
       return { items, httpStatus: r.status, partialError: null, coverage: { pagesRequested: 1, pagesFetched: 1, perPageLimit: null, itemsReturned: items.length, exhausted: false, window: win("первая страница RSS", "first RSS page") } };
     }
     case "himalayas": {
-      const items: RawJob[] = [];
+      // Поиск по всей базе по каждому направлению (страницы ?page=N) + 2 страницы свежей ленты (cursor)
       let cursor: string | null = null;
-      let fetched = 0;
-      let status: number | null = null;
-      let partialError: string | null = null;
-      let exhausted = false;
-      for (let i = 0; i < pages; i++) {
-        try {
-          const url: string = `https://himalayas.app/jobs/api?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
-          const r = await get(url);
-          status = r.status;
-          ensureOk(r.status, def.label);
-          const p = parseHimalayas(jsonOf(r.text, def.label));
-          items.push(...p.items);
-          fetched++;
-          cursor = p.next;
-          if (!cursor) {
-            exhausted = true;
-            break;
-          }
-          await wait(ctx.pauseMs ?? 1200, ctx.fetchOpts.signal);
-        } catch (e) {
-          if (fetched === 0) throw e;
-          partialError = (e as Error).message;
-          break;
-        }
-      }
-      return { items, httpStatus: status, partialError, coverage: { pagesRequested: pages, pagesFetched: fetched, perPageLimit: 20, itemsReturned: items.length, exhausted, window: win("новые сверху, кэш 24 ч", "newest first, 24 h cache") } };
+      const feed = { label: "feed", fetchPage: async () => {
+        const r = await json(`https://himalayas.app/jobs/api?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, def.label);
+        const p = parseHimalayas(r.data);
+        cursor = p.next;
+        return { items: p.items, more: !!p.next, status: r.status };
+      } };
+      const search = queries.map((q) => ({ label: q, fetchPage: async (page: number) => {
+        const r = await json(`https://himalayas.app/jobs/api/search?q=${encodeURIComponent(q)}&page=${page + 1}`, def.label);
+        const p = parseHimalayas(r.data);
+        const total = p.total ?? 0;
+        return { items: p.items, more: (page + 1) * 20 < total, status: r.status };
+      } }));
+      const jobs = search.length ? [...search, feed] : [feed];
+      return paged(pages, jobs, 20, win("поиск по всей базе и свежие объявления", "search across the database plus newest items"));
     }
     case "habrcareer": {
-      const items: RawJob[] = [];
-      let fetched = 0;
-      let status: number | null = null;
-      let partialError: string | null = null;
-      for (let i = 1; i <= pages; i++) {
-        try {
-          const r = await get(`https://career.habr.com/vacancies/rss?page=${i}&per_page=25`, "application/rss+xml, application/xml, text/xml");
-          status = r.status;
-          ensureOk(r.status, def.label);
-          const got = parseHabr(r.text);
-          items.push(...got);
-          fetched++;
-          if (!got.length) break;
-          if (i < pages) await wait(ctx.pauseMs ?? 1200, ctx.fetchOpts.signal);
-        } catch (e) {
-          if (fetched === 0) throw e;
-          partialError = (e as Error).message;
-          break;
-        }
-      }
-      return { items, httpStatus: status, partialError, coverage: { pagesRequested: pages, pagesFetched: fetched, perPageLimit: null, itemsReturned: items.length, exhausted: false, window: win("новые вакансии RSS", "new vacancies RSS") } };
+      // Новые вакансии (RSS) + поиск по направлениям профиля (?q=)
+      const rss = (u: string) => async () => {
+        const r = await get(u, "application/rss+xml, application/xml, text/xml");
+        ensureOk(r.status, def.label);
+        const got = parseHabr(r.text);
+        return { items: got, more: false, status: r.status };
+      };
+      const jobs = [
+        { label: "new", fetchPage: (page: number) => rss(`https://career.habr.com/vacancies/rss?page=${page + 1}&per_page=25`)().then((x) => ({ ...x, more: x.items.length > 0 })) },
+        ...queries.map((q) => ({ label: q, fetchPage: rss(`https://career.habr.com/vacancies/rss?q=${encodeURIComponent(q)}&page=1`) })),
+      ];
+      return paged(Math.max(pages, jobs.length + 1), jobs, null, win("новые вакансии и поиск по направлениям", "new vacancies plus search by job areas"));
+    }
+    case "hh": {
+      const token = ctx.credentials?.hhToken;
+      if (!token) throw Object.assign(new Error("hh.ru: нужен доступ (OAuth-токен) / access token required"), { notConfigured: true });
+      if (!queries.length) throw Object.assign(new Error("hh.ru: в профиле нет направлений для поиска / no job areas to search"), { notConfigured: true });
+      const areas = [...new Set((ctx.countries ?? []).map((c) => HH_AREAS[c?.toUpperCase()]).filter(Boolean))];
+      const areaParam = areas.map((a) => `&area=${a}`).join("");
+      const hhGet = async (url: string) => {
+        const r = await httpGet(url, { ...ctx.fetchOpts, headers: { ...(ctx.fetchOpts.headers ?? {}), Authorization: `Bearer ${token}`, "HH-User-Agent": "JobSearchDesktop/0.3 (https://github.com/GOMIN1I/job-search-desktop)" } }, ctx.fetcher);
+        if (r.status === 401 || r.status === 403) throw Object.assign(new Error(`hh.ru: доступ отклонён (HTTP ${r.status}) — переподключите аккаунт или токен / access denied, reconnect`), { httpStatus: r.status });
+        ensureOk(r.status, def.label);
+        return { data: jsonOf(r.text, def.label) as any, status: r.status };
+      };
+      const jobs = queries.map((q) => ({ label: q, fetchPage: async (page: number) => {
+        const r = await hhGet(`https://api.hh.ru/vacancies?text=${encodeURIComponent(q)}&search_field=name&per_page=100&page=${page}&order_by=publication_time${areaParam}`);
+        const p = parseHh(r.data);
+        return { items: p.items, more: page + 1 < Math.min(p.pages, 20), status: r.status };
+      } }));
+      return paged(pages, jobs, 100, win("поиск по направлениям и стране, сортировка по дате", "search by job areas and country, newest first"));
+    }
+    case "adzuna": {
+      const key = ctx.credentials?.adzuna;
+      if (!key?.appId || !key?.appKey) throw Object.assign(new Error("Adzuna: нужен ключ app_id/app_key / API key required"), { notConfigured: true });
+      if (!queries.length) throw Object.assign(new Error("Adzuna: в профиле нет направлений для поиска / no job areas to search"), { notConfigured: true });
+      let countries = [...new Set((ctx.countries ?? []).map((c) => c?.toLowerCase() === "uk" ? "gb" : c?.toLowerCase()).filter((c) => ADZUNA_COUNTRIES.includes(c)))];
+      if (!countries.length) countries = ["gb", "us"];
+      const jobs = countries.flatMap((cc) => queries.map((q) => ({ label: `${cc}:${q}`, fetchPage: async (page: number) => {
+        const r = await json(`https://api.adzuna.com/v1/api/jobs/${cc}/search/${page + 1}?app_id=${encodeURIComponent(key.appId)}&app_key=${encodeURIComponent(key.appKey)}&results_per_page=50&what=${encodeURIComponent(q)}&sort_by=date&content-type=application/json`, def.label);
+        const p = parseAdzuna(r.data);
+        return { items: p.items, more: (page + 1) * 50 < p.count, status: r.status };
+      } })));
+      return paged(Math.max(pages, jobs.length), jobs, 50, win(`поиск в странах: ${countries.join(", ")}`, `search in countries: ${countries.join(", ")}`));
+    }
+    case "themuse": {
+      // Категории The Muse, близкие к направлениям поиска; страницы по 20
+      const cats = museCategories(queries);
+      const jobs = cats.map((c) => ({ label: c, fetchPage: async (page: number) => {
+        const r = await json(`https://www.themuse.com/api/public/jobs?page=${page}&category=${encodeURIComponent(c)}&location=${encodeURIComponent("Flexible / Remote")}&descending=true`, def.label);
+        const p = parseMuse(r.data);
+        return { items: p.items, more: page + 1 < p.pageCount, status: r.status };
+      } }));
+      return paged(pages, jobs, 20, win("удалённые вакансии в близких категориях", "remote jobs in related categories"));
+    }
+    case "arbeitnow": {
+      let next: string | null = "https://www.arbeitnow.com/api/job-board-api?page=1";
+      const jobs = [{ label: "all", fetchPage: async () => {
+        const r = await json(next!, def.label);
+        const p = parseArbeitnow(r.data);
+        next = p.next;
+        return { items: p.items, more: !!p.next, status: r.status };
+      } }];
+      return paged(pages, jobs, 300, win("свежие по дате, несколько страниц", "newest by date, several pages"));
     }
     case "ats": {
       const companies = (ctx.companies ?? []).slice(0, pages);
@@ -548,4 +670,25 @@ export async function collect(def: SourceDefinition, ctx: CollectContext): Promi
     default:
       throw new Error(`Нет адаптера для источника ${def.kind}`);
   }
+}
+
+const MUSE_CATEGORIES: Array<[RegExp, string]> = [
+  [/data|annotat|label|analy|разметк|аналит|ai |ml|machine/i, "Data and Analytics"],
+  [/support|customer|chat|поддерж|клиент/i, "Customer Service"],
+  [/writ|content|copy|editor|текст|контент|редакт/i, "Writing and Editing"],
+  [/qa|test|тестир/i, "Software Engineering"],
+  [/admin|assistant|office|ассистент|офис|back office/i, "Administration and Office"],
+  [/project|coordinat|проект|координ/i, "Project Management"],
+  [/market|seo|smm|маркет/i, "Marketing and PR"],
+  [/hr|recruit|подбор|кадр/i, "Human Resources and Recruitment"],
+  [/sales|продаж/i, "Sales"],
+  [/design|дизайн/i, "Design and UX"],
+];
+
+/** Категории The Muse для запросов профиля (по умолчанию — данные и поддержка). */
+export function museCategories(queries: string[]): string[] {
+  const out = new Set<string>();
+  for (const q of queries) for (const [re, c] of MUSE_CATEGORIES) if (re.test(` ${q} `)) out.add(c);
+  if (!out.size) ["Data and Analytics", "Customer Service"].forEach((c) => out.add(c));
+  return [...out].slice(0, 4);
 }

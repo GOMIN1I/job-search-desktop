@@ -1,5 +1,6 @@
 // Командная строка для разработчика/администратора: те же функции ядра, что и в приложении.
-//   node dist/cli.js run --data <dir>                  — один поиск по включённым источникам (с лимитами)
+//   node dist/cli.js run --data <dir> [--sources a,b] [--enable hh] — один поиск по включённым источникам (с лимитами);
+//     доступы: JSD_HH_TOKEN, JSD_ADZUNA_APP_ID, JSD_ADZUNA_APP_KEY
 //   node dist/cli.js import-profile <file> --data <dir> — импорт профилей кандидатов (JSON)
 //   node dist/cli.js import-vacancies <file> --label <l> --data <dir>
 //   node dist/cli.js ai-test --base <url> --model <m> [--data <dir>] [--vacancy <id>] — проверка OpenAI-совместимого backend
@@ -41,7 +42,14 @@ const open = () => {
 async function main() {
   if (cmd === "run") {
     const repo = open();
-    const r = await runSearch(repo, "manual", { onProgress: (p) => p.sourceId && p.status && console.log(`  ${p.sourceId}: ${p.status}`) });
+    // --enable hh,adzuna — включить источники; --sources a,b — опросить только их; доступы — из переменных окружения
+    for (const id of (opt("enable") ?? "").split(",").filter(Boolean)) repo.updateSource(id, { enabled: true });
+    const sourceIds = opt("sources")?.split(",").filter(Boolean);
+    const credentials = {
+      hhToken: process.env.JSD_HH_TOKEN || null,
+      adzuna: process.env.JSD_ADZUNA_APP_ID && process.env.JSD_ADZUNA_APP_KEY ? { appId: process.env.JSD_ADZUNA_APP_ID, appKey: process.env.JSD_ADZUNA_APP_KEY } : null,
+    };
+    const r = await runSearch(repo, "manual", { sourceIds, credentials, onProgress: (p) => p.sourceId && p.status && console.log(`  ${p.sourceId}: ${p.status}`) });
     const attempts = repo.attemptsForRun(r.runId).map((a) => ({ source: a.sourceId, status: a.status, http: a.httpStatus, items: a.items, coverage: a.coverage ? { pages: `${a.coverage.pagesFetched}/${a.coverage.pagesRequested}`, perPage: a.coverage.perPageLimit, exhausted: a.coverage.exhausted } : null, error: a.error }));
     const out = { at: new Date().toISOString(), runId: r.runId, status: r.status, stats: r.stats, attempts };
     console.log(JSON.stringify(out, null, 2));

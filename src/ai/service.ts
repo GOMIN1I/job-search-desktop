@@ -11,7 +11,12 @@ import { AiError, type AiTransport } from "./transports";
 import {
   EXTRACT_JSON_SCHEMA, EXTRACT_PROMPT_VERSION, EXTRACT_SYSTEM, ExtractSchema, extractUserPrompt, LETTER_JSON_SCHEMA, LETTER_PROMPT_VERSION,
   LetterSchema, letterSystem, type ExtractResult, type LetterResult,
+  INSTRUCTIONS_JSON_SCHEMA, INSTRUCTIONS_PROMPT_VERSION, INSTRUCTIONS_SYSTEM, InstructionsSchema, instructionsUserPrompt,
+  NOTES_JSON_SCHEMA, NOTES_PROMPT_VERSION, NOTES_SYSTEM, NotesSchema, notesUserPrompt,
 } from "./prompts";
+import { COUNTRIES } from "../core/geo";
+import { SERVICE_FAMILIES } from "../core/policy";
+import type { InstructionDirectives } from "../shared/types";
 
 export const DEFAULT_PRICING: AiSettings["pricing"] = {
   "claude-haiku-5-5": { inputPerMTok: 0.1, outputPerMTok: 0.5 },
@@ -119,6 +124,43 @@ export class AiService {
     });
     const { facts, dropped } = mergeExtraction(v, r.result, `${r.model}@${r.promptVersion}`);
     return { ...r, facts, dropped, summary: msg(r.result.summary_ru, r.result.summary_en) };
+  }
+
+  /** Разбор «дополнительных инструкций» моделью: дополняет разбор правилами. */
+  async parseInstructions(text: string, signal?: AbortSignal): Promise<Partial<InstructionDirectives>> {
+    const r = await this.call({
+      purpose: "parse_instructions", promptVersion: INSTRUCTIONS_PROMPT_VERSION, system: INSTRUCTIONS_SYSTEM, user: instructionsUserPrompt(text), schema: INSTRUCTIONS_JSON_SCHEMA as any,
+      maxTokens: 1200, cacheKey: sha(text), parse: (raw) => InstructionsSchema.parse(raw), signal,
+    });
+    const x = r.result;
+    const iso = (arr: string[]) => arr.map((c) => c.trim().toUpperCase()).filter((c) => COUNTRIES.some((k) => k.code === c));
+    const sources: string[] = [];
+    const hosts: string[] = [];
+    for (const site of x.exclude_sites) {
+      const s = site.toLowerCase().trim();
+      const fam = SERVICE_FAMILIES.find((f) => f.names.includes(s) || f.hosts.includes(s));
+      if (fam) {
+        sources.push(...fam.sourceIds);
+        hosts.push(...fam.hosts);
+      } else if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s)) hosts.push(s);
+    }
+    return {
+      excludeSources: sources, excludeHosts: hosts, excludeKeywords: x.exclude_keywords.map((k) => k.toLowerCase()), requireKeywords: x.require_keywords.map((k) => k.toLowerCase()),
+      countries: iso(x.countries), excludeCountries: iso(x.exclude_countries), postingLanguages: x.posting_languages.map((l) => l.toLowerCase().slice(0, 2)), workFormats: x.work_formats, notes: x.free_form,
+    };
+  }
+
+  /** Проверка вакансии по свободной части инструкций. Цитата обязана быть дословной, иначе вывод — «неясно». */
+  async checkInstructionNotes(notes: string[], v: Vacancy, candidateId: string, signal?: AbortSignal): Promise<{ status: "pass" | "fail" | "unknown"; reason: Msg; quote: string | null }> {
+    const r = await this.call({
+      purpose: "instruction_notes", promptVersion: NOTES_PROMPT_VERSION, system: NOTES_SYSTEM, user: notesUserPrompt(notes, v), schema: NOTES_JSON_SCHEMA as any,
+      maxTokens: 600, cacheKey: `${v.contentHash}|${sha(notes.join("\n"))}`, parse: (raw) => NotesSchema.parse(raw), vacancyId: v.id, candidateId, signal,
+    });
+    const x = r.result;
+    const quoteOk = !!x.quote && quoteIsInText(x.quote, `${v.title}\n${v.description}`);
+    if (x.verdict === "does_not_fit" && quoteOk) return { status: "fail", reason: msg(x.reason_ru, x.reason_en), quote: x.quote };
+    if (x.verdict === "fits") return { status: "pass", reason: msg(x.reason_ru, x.reason_en), quote: quoteOk ? x.quote : null };
+    return { status: "unknown", reason: msg(`ИИ не уверен: ${x.reason_ru}`, `The AI is not sure: ${x.reason_en}`), quote: null };
   }
 
   /** Черновик письма только из переданных фактов. Блокируется, если работодатель запрещает AI-ответы. */

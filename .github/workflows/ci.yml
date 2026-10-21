@@ -82,3 +82,19 @@ jobs:
             docs/screenshots/en-*.png
           if-no-files-found: warn
           retention-days: 14
+
+  search-server:
+    # Сервер поиска: сборка Docker-образа и проверка, что он запускается и отвечает
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f server/Dockerfile -t jsd-search-server .
+      - name: Run and check health
+        run: |
+          docker run -d --name jsd -p 8787:8787 -e SERVER_SECRET="$(openssl rand -hex 32)" jsd-search-server
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8787/health && break; sleep 1; done
+          curl -fs http://127.0.0.1:8787/health
+          TOKEN=$(curl -fs -X POST http://127.0.0.1:8787/v1/accounts | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
+          curl -fs -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8787/v1/status
+          docker logs jsd

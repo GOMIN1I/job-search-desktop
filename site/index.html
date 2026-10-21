@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0B5D4B">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="assets/fonts/golos-text-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 <a class="skip" href="#main" data-en="Skip to content">Перейти к содержанию</a>
@@ -39,16 +39,17 @@
         Бесплатное приложение для macOS и Windows. Оно само просматривает сайты с вакансиями, отсеивает неподходящие и размечает остальные, как маркером: что подходит, что уточнить и что точно нет — у каждой пометки есть цитата из объявления. Решение и отклик остаются за вами.
       </p>
       <div class="cta" id="download">
-        <a class="btn btn-primary btn-lg" id="dl-primary" href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span id="dl-primary-label">Скачать для macOS</span>
-        </a>
-        <div class="os-choice" role="group" aria-label="Выбор системы">
-          <a id="dl-mac" href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg" data-en="macOS (Apple Silicon)">macOS (Apple Silicon)</a>
-          <a id="dl-win" href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe" data-en="Windows 10/11 (x64)">Windows 10/11 (x64)</a>
-          <a href="https://github.com/GOMIN1I/job-search-desktop/releases/latest" data-en="All files">Все файлы</a>
+        <div class="dl-pair" role="group" aria-label="Скачать" data-en-label="Download">
+          <a class="btn btn-dl" id="dl-mac" data-os="mac" href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="dl-text"><span class="dl-title" data-en="Download for macOS">Скачать для macOS</span><span class="dl-sub" data-en="Apple Silicon, macOS 13 or later">Apple Silicon, macOS 13 и новее</span></span>
+          </a>
+          <a class="btn btn-dl" id="dl-win" data-os="win" href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="dl-text"><span class="dl-title" data-en="Download for Windows">Скачать для Windows</span><span class="dl-sub" data-en="Windows 10 and 11, 64-bit">Windows 10 и 11, 64-бит</span></span>
+          </a>
         </div>
-        <p class="fine" data-en="Free and open source (MIT). Your data stays on your computer.">Бесплатно, открытый код (MIT). Данные остаются на вашем компьютере.</p>
+        <p class="fine"><a href="https://github.com/GOMIN1I/job-search-desktop/releases/latest" data-en="All files and versions">Все файлы и версии</a>. <span data-en="Free and open source (MIT). Your data stays on your computer.">Бесплатно, открытый код (MIT). Данные остаются на вашем компьютере.</span></p>
       </div>
     </div>
 
@@ -128,7 +129,8 @@
       <div><dt data-en="Honest unknowns">Честное «неизвестно»</dt><dd data-en="“Up to”, platform estimates and hourly rates without guaranteed hours never count as confirmed pay. “Worldwide” never counts as hiring from your country.">«До», оценки площадок и почасовая ставка без гарантированных часов не считаются подтверждённой оплатой. «Worldwide» не считается наймом из вашей страны.</dd></div>
       <div><dt data-en="Applications by stage">Отклики по этапам</dt><dd data-en="Saved, preparing, applied, response, interview, offer — with reminders and a checklist. Opening a site never marks you as applied.">Сохранено, готовлю, отправлено, ответ, интервью, оффер — с напоминаниями и чек-листом. Открытие сайта не считается откликом.</dd></div>
       <div><dt data-en="Documents from your facts">Документы из ваших фактов</dt><dd data-en="CV and letter drafts use only what you confirmed. If an employer forbids AI-written answers, AI drafting is switched off for that job.">Черновики резюме и писем — только из подтверждённого вами. Если работодатель запрещает AI-ответы, генерация для этой вакансии отключается.</dd></div>
-      <div><dt data-en="Search on a schedule">Поиск по расписанию</dt><dd data-en="Daily or weekly while the app is running, with one catch-up after sleep and no duplicate notifications.">Каждый день или неделю, пока приложение запущено; один догоняющий запуск после сна, без повторных уведомлений.</dd></div>
+      <div><dt data-en="Search on a schedule">Поиск по расписанию</dt><dd data-en="Daily or weekly in your time zone. The system runs it even when the app is closed; with a search server it also runs while the computer is off, and results are waiting when you come back.">Каждый день или неделю в вашем часовом поясе. Система запускает поиск, даже когда приложение закрыто; с сервером поиска — и когда компьютер выключен, а результаты ждут вас при возвращении.</dd></div>
+      <div><dt data-en="Your own instructions">Ваши инструкции</dt><dd data-en="Write in your own words which sites to skip, which countries and languages to consider and what to avoid. They are applied on every search, and you see how the app understood them.">Своими словами: какие площадки пропускать, какие страны и языки рассматривать, чего избегать. Применяется в каждом поиске, и видно, как приложение это поняло.</dd></div>
       <div><dt data-en="Your data stays yours">Данные остаются у вас</dt><dd data-en="Everything is stored locally. Export, backup and import are built in.">Всё хранится на вашем компьютере. Экспорт, резервная копия и импорт встроены.</dd></div>
     </dl>
   </section>
@@ -155,7 +157,8 @@
   <section class="faq" id="faq" aria-labelledby="faq-h">
     <h2 id="faq-h" data-en="Questions">Вопросы</h2>
     <details><summary data-en="Does the app apply for me?">Приложение откликается за меня?</summary><p data-en="No. It finds, checks and explains jobs, prepares a checklist and a letter draft. You submit applications yourself on the employer's site.">Нет. Оно находит, проверяет и объясняет вакансии, готовит чек-лист и черновик письма. Откликаетесь вы сами на сайте работодателя.</p></details>
-    <details><summary data-en="Which sites does it check?">Какие сайты оно проверяет?</summary><p data-en="Jobicy, Remotive, Remote OK, Himalayas, Working Nomads, We Work Remotely, Habr Career and public company boards on Greenhouse, Lever and Ashby. It follows each site's rules and limits. hh.ru is not used.">Jobicy, Remotive, Remote OK, Himalayas, Working Nomads, We Work Remotely, Хабр Карьера и открытые страницы компаний на Greenhouse, Lever и Ashby. Правила и лимиты каждого сайта соблюдаются. hh.ru не используется.</p></details>
+    <details><summary data-en="Which sites does it check?">Какие сайты оно проверяет?</summary><p data-en="Himalayas, The Muse, Arbeitnow, Jobicy, Remotive, Remote OK, Working Nomads, We Work Remotely, Habr Career and public company boards on Greenhouse, Lever and Ashby — with search by your job areas, not just the newest posts. hh.ru and Adzuna (19 countries) connect with your own access. You choose which sites to use, and each site's rules and limits are followed.">Himalayas, The Muse, Arbeitnow, Jobicy, Remotive, Remote OK, Working Nomads, We Work Remotely, Хабр Карьера и открытые страницы компаний на Greenhouse, Lever и Ashby — с поиском по вашим направлениям, а не только по свежим объявлениям. hh.ru и Adzuna (19 стран) подключаются с вашим доступом. Какие сайты использовать, выбираете вы; правила и лимиты каждого сайта соблюдаются.</p></details>
+    <details><summary data-en="Does it search while my computer is off?">Ищет ли оно, когда компьютер выключен?</summary><p data-en="When the app is closed, the system starts the search on schedule; after sleep it runs once on wake-up. To search while the computer is off, connect a search server in Settings (you can deploy your own by following the guide in the repository): it runs your schedule in your time zone, and the app picks up the results when you open it.">Когда приложение закрыто, поиск по расписанию запускает система; если компьютер спал — один раз после пробуждения. Чтобы поиск шёл при выключенном компьютере, подключите в настройках сервер поиска (свой можно развернуть по инструкции в репозитории): он выполняет ваше расписание в вашем часовом поясе, а приложение забирает результаты, когда вы его откроете.</p></details>
     <details><summary data-en="Does it guarantee I will find a job?">Это гарантирует, что я найду работу?</summary><p data-en="No app can promise that. It saves time on reading and sorting and is honest about what is unknown, so you can spend your effort where it matters.">Никакое приложение не может это обещать. Оно экономит время на чтении и сортировке и честно показывает неизвестное — чтобы силы уходили туда, где есть смысл.</p></details>
     <details><summary data-en="Do I need an AI subscription?">Нужна ли подписка на нейросеть?</summary><p data-en="No. You can install a free local model inside the app or skip AI entirely. If you prefer a cloud model, you can add your own API key in Settings.">Нет. Можно установить бесплатную локальную модель прямо в приложении или обойтись без AI. Если хотите облачную модель — добавьте свой API-ключ в настройках.</p></details>
     <details><summary data-en="What computer do I need?">Какой нужен компьютер?</summary><p data-en="A Mac with Apple Silicon (M1 or newer) on macOS 13+, or Windows 10/11 64-bit. The app itself needs about 300 MB; a local model needs 5–7 GB of disk space and 8–16 GB of memory.">Mac с Apple Silicon (M1 и новее) на macOS 13+ или Windows 10/11 64-бит. Самому приложению нужно около 300 МБ; локальной модели — 5–7 ГБ на диске и 8–16 ГБ памяти.</p></details>
@@ -166,7 +169,17 @@
   <section class="final" aria-labelledby="final-h">
     <img src="assets/icon.svg" width="96" height="96" alt="">
     <h2 id="final-h" data-en="Spend your time on the jobs that deserve it">Тратьте время на вакансии, которые этого стоят</h2>
-    <a class="btn btn-primary btn-lg" id="dl-final" href="#download" data-en="Download for free">Скачать бесплатно</a>
+    <div class="dl-pair" role="group" aria-label="Скачать" data-en-label="Download">
+          <a class="btn btn-dl" id="dlf-mac" data-os="mac" href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-mac-arm64.dmg">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="dl-text"><span class="dl-title" data-en="Download for macOS">Скачать для macOS</span><span class="dl-sub" data-en="Apple Silicon, macOS 13 or later">Apple Silicon, macOS 13 и новее</span></span>
+          </a>
+          <a class="btn btn-dl" id="dlf-win" data-os="win" href="https://github.com/GOMIN1I/job-search-desktop/releases/latest/download/Job-Search-Desktop-windows-x64-setup.exe">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="dl-text"><span class="dl-title" data-en="Download for Windows">Скачать для Windows</span><span class="dl-sub" data-en="Windows 10 and 11, 64-bit">Windows 10 и 11, 64-бит</span></span>
+          </a>
+        </div>
+
   </section>
 </main>
 
@@ -176,6 +189,6 @@
   <a href="https://github.com/GOMIN1I/job-search-desktop/blob/main/LICENSE">MIT</a>
   <span data-en="You send every application yourself.">Каждый отклик вы отправляете сами.</span>
 </footer>
-<script src="app.js?v=3" defer></script>
+<script src="app.js?v=4" defer></script>
 </body>
 </html>

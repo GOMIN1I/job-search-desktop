@@ -49,10 +49,17 @@ main > section { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
 /* первый экран */
 .hero { display: grid; grid-template-columns: 1fr minmax(380px, 500px); gap: 64px; align-items: center; padding-top: 72px !important; padding-bottom: 96px !important; }
 .lead { font-size: 20px; color: var(--soft); margin-top: 22px; max-width: 34em; line-height: 1.55; }
-.cta { margin-top: 34px; display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
-.os-choice { display: flex; flex-wrap: wrap; gap: 16px; font-size: 15px; }
-.os-choice a { color: var(--soft); }
-.os-choice a[aria-current="true"] { color: var(--ink); font-weight: 600; }
+.cta { margin-top: 34px; display: flex; flex-direction: column; gap: 14px; align-items: stretch; max-width: 560px; }
+/* Две равные кнопки: подходящая системе — залита, вторая — с контрастной рамкой того же размера */
+.dl-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+.final .dl-pair { max-width: 560px; }
+.btn-dl { height: auto; min-height: 64px; padding: 12px 18px; justify-content: flex-start; text-align: left; gap: 12px; border: 2px solid var(--pine); color: var(--pine); background: var(--surface); }
+.btn-dl:hover { background: var(--sunk); }
+.btn-dl.is-detected { background: var(--pine); color: var(--on-pine); }
+.btn-dl.is-detected:hover { background: var(--pine-2); }
+.dl-text { display: flex; flex-direction: column; line-height: 1.25; }
+.dl-title { font-size: 17px; font-weight: 650; }
+.dl-sub { font-size: 13px; font-weight: 450; opacity: .85; }
 .fine { font-size: 14px; color: var(--faint); line-height: 1.5; }
 
 /* живое объявление */
@@ -157,6 +164,7 @@ main > section { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
   .dl-auto { display: none; }
   .posting { padding: 20px 18px 16px; }
   .btn-lg { width: 100%; }
+  .dl-pair { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

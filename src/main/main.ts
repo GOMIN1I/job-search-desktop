@@ -8,12 +8,18 @@ import { openDatabase } from "../db/db";
 import { Repo } from "../db/repo";
 import { createApi, type Platform } from "./api";
 import { planSchedule } from "../core/schedule";
+import { CredentialStore } from "./credentials";
+import { CloudClient } from "./cloud";
+import { BACKGROUND_FLAG, syncOsTask } from "./background";
 import { assessAll, refreshFacts } from "../pipeline/run";
 import type { Msg, ScheduleSettings, ScheduleState, UiLang } from "../shared/types";
 import { msg } from "../shared/types";
 
-// Каталог данных — в пользовательском профиле, отдельно от бинарника. JSD_USER_DATA — для синтетических демо/тестов.
-if (process.env.JSD_USER_DATA) app.setPath("userData", path.resolve(process.env.JSD_USER_DATA));
+// Каталог данных — в пользовательском профиле, отдельно от бинарника. JSD_USER_DATA (или --user-data=) — для синтетических демо/тестов.
+const userDataArg = process.argv.find((a) => a.startsWith("--user-data="))?.slice("--user-data=".length);
+if (process.env.JSD_USER_DATA || userDataArg) app.setPath("userData", path.resolve(process.env.JSD_USER_DATA || userDataArg!));
+// Запуск системной задачей, когда приложение закрыто: без окна, один поиск по расписанию — и выход.
+const backgroundMode = process.argv.includes(BACKGROUND_FLAG);
 app.setName("Job Search Desktop");
 if (process.platform === "win32") app.setAppUserModelId("app.jobsearchdesktop");
 
@@ -23,6 +29,31 @@ if (!gotLock) app.quit();
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let repo: Repo;
+let credStore: CredentialStore | null = null;
+let apiCall: ((method: string, args: unknown) => Promise<unknown>) | null = null;
+
+/** Данные приложения hh.ru, если владелец сборки их задал (переменные окружения или hh-client.json рядом с ресурсами; в git не хранится). */
+function builtInHhClient(): { hhClientId?: string; hhClientSecret?: string } {
+  if (process.env.JSD_HH_CLIENT_ID) return { hhClientId: process.env.JSD_HH_CLIENT_ID, hhClientSecret: process.env.JSD_HH_CLIENT_SECRET };
+  for (const p of [path.join(process.resourcesPath ?? "", "hh-client.json"), path.join(app.getAppPath(), "build", "hh-client.json")]) {
+    try {
+      const j = JSON.parse(fs.readFileSync(p, "utf8"));
+      if (j.clientId) return { hhClientId: j.clientId, hhClientSecret: j.clientSecret };
+    } catch {
+      /* файла нет */
+    }
+  }
+  return {};
+}
+
+function creds(): CredentialStore {
+  credStore ??= new CredentialStore(repo, {
+    encryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (plain) => safeStorage.encryptString(plain).toString("base64"),
+    decrypt: (b64) => safeStorage.decryptString(Buffer.from(b64, "base64")),
+  }, fetch, builtInHhClient());
+  return credStore;
+}
 let quitting = false;
 let worker: Worker | null = null;
 let runState: { running: boolean; runId: string | null; progress: unknown } = { running: false, runId: null, progress: null };
@@ -47,9 +78,12 @@ function iconPath(): string {
 
 async function startRun(trigger: "manual" | "scheduled" | "catchup"): Promise<{ runId: string | null; error: string | null; alreadyRunning?: boolean }> {
   if (worker) return { runId: runState.runId, error: t(msg("Поиск уже выполняется", "A search is already running")), alreadyRunning: true };
+  // Доступы расшифровываются здесь и передаются только фоновому потоку сбора
+  const credentials = await creds().forRun().catch(() => ({ hhToken: null, adzuna: null }));
+  if (worker) return { runId: runState.runId, error: t(msg("Поиск уже выполняется", "A search is already running")), alreadyRunning: true };
   return new Promise((resolve) => {
     let resolved = false;
-    const w = new Worker(path.join(__dirname, "worker.js"), { workerData: { dbPath: dbPath(), trigger } });
+    const w = new Worker(path.join(__dirname, "worker.js"), { workerData: { dbPath: dbPath(), trigger, credentials } });
     worker = w;
     runState = { running: true, runId: null, progress: null };
     send("run-progress", runState);
@@ -64,10 +98,22 @@ async function startRun(trigger: "manual" | "scheduled" | "catchup"): Promise<{ 
       } else if (m.type === "done") {
         runState = { running: false, runId: m.runId, progress: null };
         send("run-finished", m);
+        const done = runDone;
+        runDone = null;
+        // Свободную часть «инструкций для ИИ» проверяет модель — если она подключена
+        void (apiCall?.("instructions.checkNotes", { limit: 15 }) ?? Promise.resolve())
+          .then(() => send("data-changed", { what: "vacancies" }))
+          .catch(() => {})
+          .finally(() => {
+            deliverNotifications();
+            done?.();
+          });
         deliverNotifications();
         updateTray();
       } else if (m.type === "error") {
         runState = { running: false, runId: m.runId, progress: null };
+        runDone?.();
+        runDone = null;
         send("run-finished", { error: m.message });
         if (!resolved) {
           resolved = true;
@@ -115,29 +161,52 @@ function deliverNotifications() {
 // ---------- Планировщик (локальный: работает, только пока приложение запущено) ----------
 let scheduleTimer: NodeJS.Timeout | null = null;
 
-function scheduleTick() {
+let runDone: (() => void) | null = null;
+/** Обработать расписание; промис завершается, когда запущенный поиск закончится (или сразу, если запускать нечего). */
+function scheduleTick(): Promise<"ran" | "nothing"> {
   const s = { enabled: false, paused: false, cadence: "daily", time: "09:00", weekday: 1, runInBackground: true, ...repo.getMeta<Partial<ScheduleSettings>>("schedule", {}) } as ScheduleSettings;
   const st = repo.getMeta<ScheduleState>("schedule_state", { lastHandledSlot: null, lastRunId: null });
   const plan = planSchedule(s, st.lastHandledSlot, new Date());
   if (plan.action === "none" && plan.slot && !st.lastHandledSlot) {
     repo.setMeta("schedule_state", { ...st, lastHandledSlot: plan.slot });
-    return;
+    return Promise.resolve("nothing");
   }
-  if (plan.action !== "run" && plan.action !== "catchup") return;
+  if (plan.action !== "run" && plan.action !== "catchup") return Promise.resolve("nothing");
   for (const m of plan.missed) repo.addScheduleEvent("missed", m, "Компьютер был выключен/спал или приложение закрыто / computer off, asleep or app closed");
   if (worker) {
     repo.addScheduleEvent("skipped_running", plan.slot, "Уже выполняется другой поиск / another search is running");
     repo.setMeta("schedule_state", { ...st, lastHandledSlot: plan.slot });
-    return;
+    return Promise.resolve("nothing");
   }
   repo.addScheduleEvent(plan.action === "run" ? "ran" : "catchup", plan.slot, plan.action === "catchup" ? `Один догоняющий запуск, пропущено слотов: ${plan.missed.length + 1}` : "");
   repo.setMeta("schedule_state", { ...st, lastHandledSlot: plan.slot });
   if (plan.missed.length) {
     repo.addNotification({ candidateId: null, kind: "schedule_missed", dedupeKey: `missed:${plan.slot}`, title: msg("Пропущены запуски по расписанию", "Scheduled runs were missed"), body: msg(`Пропущено: ${plan.missed.length + 1}. Выполнен один догоняющий поиск.`, `Missed: ${plan.missed.length + 1}. One catch-up search was run.`), vacancyId: null });
   }
+  const finished = new Promise<"ran">((resolve) => {
+    runDone = () => resolve("ran");
+  });
   void startRun(plan.action === "run" ? "scheduled" : "catchup").then((r) => {
     if (r.runId) repo.setMeta("schedule_state", { lastHandledSlot: plan.slot, lastRunId: r.runId });
+    if (!r.runId) runDone?.();
   });
+  return finished;
+}
+
+/** Системная задача ОС под текущее расписание (или её удаление). */
+async function syncBackgroundTask() {
+  const s = { enabled: false, paused: false, cadence: "daily", time: "09:00", weekday: 1, runInBackground: true, osTask: true, ...repo.getMeta<Partial<ScheduleSettings>>("schedule", {}) } as ScheduleSettings;
+  // JSD_NO_OS_TASK — автотесты и записи демо не трогают системный планировщик
+  const wanted = s.enabled && !s.paused && s.osTask !== false && !process.env.JSD_NO_OS_TASK;
+  const program = app.isPackaged ? [process.execPath, BACKGROUND_FLAG] : [process.execPath, app.getAppPath(), BACKGROUND_FLAG];
+  if (process.env.JSD_USER_DATA) program.push(`--user-data=${path.resolve(process.env.JSD_USER_DATA)}`);
+  try {
+    const st = await syncOsTask(wanted ? { program, schedule: s } : null, { logDir: path.join(dataDir(), "logs") });
+    repo.setMeta("os_task_status", { ...st, wanted, at: new Date().toISOString() });
+    if (wanted && !st.installed) repo.log("warn", "schedule", `Системная задача не установлена: ${st.detail}`);
+  } catch (e) {
+    repo.setMeta("os_task_status", { supported: true, installed: false, wanted, detail: (e as Error).message, at: new Date().toISOString() });
+  }
 }
 
 function startScheduler() {
@@ -262,12 +331,17 @@ function platformImpl(): Platform {
     emit: send,
     onScheduleChanged: () => {
       updateTray();
-      scheduleTick();
+      void scheduleTick();
+      void syncBackgroundTask();
     },
   };
 }
 
-app.on("second-instance", showWindow);
+app.on("second-instance", (_e, argv) => {
+  // Системная задача сработала, пока приложение открыто: не показываем окно, просто проверяем расписание
+  if (argv.includes(BACKGROUND_FLAG)) void scheduleTick();
+  else showWindow();
+});
 
 app.whenReady().then(() => {
   if (!gotLock) return;
@@ -280,7 +354,24 @@ app.whenReady().then(() => {
 
   // Запрет любых разрешений (камера, геолокация и т.д.) и строгая CSP для всех ответов.
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
-  const api = createApi(repo, platformImpl());
+  const secure = { encryptionAvailable: () => safeStorage.isEncryptionAvailable(), encrypt: (p: string) => safeStorage.encryptString(p).toString("base64"), decrypt: (b: string) => safeStorage.decryptString(Buffer.from(b, "base64")) };
+  const schedule = () => ({ enabled: false, paused: false, cadence: "daily", time: "09:00", weekday: 1, runInBackground: true, ...repo.getMeta<Partial<ScheduleSettings>>("schedule", {}) }) as ScheduleSettings;
+  const cloud = new CloudClient(repo, secure, () => creds().forRun(), schedule);
+  const api = createApi(repo, platformImpl(), creds(), cloud);
+  apiCall = api;
+  // Забрать то, что сервер поиска нашёл, пока приложение было закрыто; затем — раз в 30 минут
+  const pullCloud = () => {
+    if (!cloud.state().connected) return;
+    void cloud.pull().then((r) => {
+      if (r && (r.inserted || r.notifications)) {
+        send("data-changed", { what: "vacancies" });
+        deliverNotifications();
+      }
+    }).catch(() => {});
+  };
+  setTimeout(pullCloud, 8000);
+  setInterval(pullCloud, 30 * 60_000);
+  powerMonitor.on("resume", () => setTimeout(pullCloud, 15_000));
   ipcMain.handle("api", async (event, payload) => {
     // Принимаем вызовы только от собственного окна.
     if (!win || event.sender.id !== win.webContents.id) return { ok: false, error: msg("Отклонено", "Rejected"), code: "forbidden" };
@@ -299,18 +390,34 @@ app.whenReady().then(() => {
     );
   } else Menu.setApplicationMenu(null);
 
+  if (backgroundMode) {
+    // Без окна и значка: один поиск, если он причитается по расписанию, уведомление — и выход
+    app.dock?.hide();
+    repo.log("info", "schedule", "Запуск системной задачей (приложение было закрыто)");
+    const guard = setTimeout(() => app.quit(), 55 * 60_000);
+    void scheduleTick().then((r) => {
+      repo.log("info", "schedule", `Фоновый запуск завершён: ${r}`);
+      clearTimeout(guard);
+      setTimeout(() => app.quit(), 1500);
+    });
+    return;
+  }
   createWindow();
   createTray();
   startScheduler();
+  void syncBackgroundTask();
   powerMonitor.on("resume", () => setTimeout(scheduleTick, 10_000));
 });
 
-app.on("activate", showWindow);
+app.on("activate", () => {
+  if (!backgroundMode) showWindow();
+});
 app.on("before-quit", () => {
   quitting = true;
   worker?.postMessage({ type: "cancel" });
 });
 app.on("window-all-closed", () => {
+  if (backgroundMode) return;
   const s = { runInBackground: true, enabled: false, ...repo?.getMeta<Partial<ScheduleSettings>>("schedule", {}) };
   if (!(s.runInBackground && s.enabled)) app.quit();
 });

@@ -5,6 +5,8 @@ import { call } from "../api";
 import { useApp } from "../state";
 import { RulesEditor, RulesSummary } from "../components/RulesEditor";
 import { DemoBadge, Icon, Modal, useBusy, useToast } from "../components/ui";
+import { AiInstructionsEditor } from "../components/AiInstructions";
+import type { AiInstructions } from "../../shared/types";
 
 interface ProfileData { candidate: Candidate; profile: SearchProfileVersion; history: Array<{ version: number; createdAt: string; note: string }>; skills: SkillEvidence[]; materials: MaterialVersion[] }
 
@@ -45,7 +47,9 @@ export function Profile() {
         </div>
         {p.candidate.notes && <p className="subtle" style={{ marginBottom: 14, whiteSpace: "pre-wrap" }}>{p.candidate.notes}</p>}
 
-        <section className="card" aria-labelledby="rules">
+        <InstructionsCard candidateId={cid} rules={p.profile.rules} onSaved={() => void load()} />
+
+        <section className="card" style={{ marginTop: 14 }} aria-labelledby="rules">
           <div className="card-header"><h2 id="rules">{t("prof.rules")}</h2><span className="badge b-outline">v{p.profile.version}</span><span style={{ flex: 1 }} /><button className="btn btn-sm" onClick={() => { setEditRules(JSON.parse(JSON.stringify(p.profile.rules))); setNote(""); }}>{t("prof.editRules")}</button></div>
           <div className="card-body">
             <RulesSummary rules={p.profile.rules} />
@@ -83,7 +87,7 @@ export function Profile() {
             <span style={{ flex: 1 }} />
             <button className="btn btn-sm" onClick={() => run("check", async () => { const r = await call<{ missing: number }>("materials.checkFiles", { candidateId: cid }); push(`${t("prof.fileMissing")}: ${r.missing}`); })}>{t("prof.checkFiles")}</button>
             <button className="btn btn-sm" onClick={() => run("cv", async () => { await call("materials.createDraft", { candidateId: cid, kind: "cv", lang, mode: "template" }); })}>{t("prof.newCv")}</button>
-            <button className="btn btn-sm btn-primary" onClick={() => run("import", async () => { await call("materials.importFile", { candidateId: cid, kind: "cv" }); })}>{t("prof.importFile")}</button>
+            <button className="btn btn-sm btn-primary" onClick={() => run("import", async () => { const r = await call<{ cancelled?: boolean; extraction?: { status: string; message: { ru: string; en: string } } }>("materials.importFile", { candidateId: cid, kind: "cv" }); if (r.extraction) push(lang === "ru" ? r.extraction.message.ru : r.extraction.message.en, r.extraction.status !== "ok"); })}>{t("prof.importFile")}</button>
           </div>
           <div className="card-body">
             {!p.materials.length && <p className="muted">—</p>}
@@ -107,7 +111,7 @@ export function Profile() {
                     {m.status !== "human_reviewed" && <button className="btn btn-sm btn-ghost" onClick={() => run("rev", () => call("materials.setStatus", { candidateId: cid, id: m.id, status: "human_reviewed" }))}>{t("prof.markReviewed")}</button>}
                     <select className="select" style={{ height: 26, fontSize: 12 }} value="" aria-label={t("prof.export")} onChange={(e) => { const f = e.target.value; if (f) void run("exp", async () => { const r = await call<{ path?: string }>("materials.export", { candidateId: cid, id: m.id, format: f }); if (r.path) push(r.path); }); }}>
                       <option value="">{t("prof.export")}…</option>
-                      <option value="pdf">PDF</option><option value="html">HTML</option><option value="md">Markdown</option><option value="txt">TXT</option>
+                      <option value="docx">DOCX</option><option value="pdf">PDF</option><option value="html">HTML</option><option value="md">Markdown</option><option value="txt">TXT</option>
                     </select>
                     <button className="btn btn-sm btn-ghost btn-danger" onClick={() => run("del", () => call("materials.delete", { candidateId: cid, id: m.id }))} aria-label={t("common.delete")}>✕</button>
                   </div>
@@ -186,5 +190,43 @@ export function Profile() {
         </Modal>
       )}
     </div>
+  );
+}
+
+/** Заметная карточка «Дополнительные инструкции для ИИ»: сохраняется в версии профиля и применяется в каждом поиске. */
+function InstructionsCard({ candidateId, rules, onSaved }: { candidateId: string; rules: SearchRules; onSaved: () => void }) {
+  const { lang } = useI18n();
+  const L = (ru: string, en: string) => (lang === "ru" ? ru : en);
+  const { push } = useToast();
+  const { busy, run } = useBusy();
+  const [value, setValue] = useState<AiInstructions | undefined>(rules.aiInstructions);
+  const [open, setOpen] = useState(0);
+  const [aiConnected, setAi] = useState(false);
+  const dirty = (value?.text ?? "").trim() !== (rules.aiInstructions?.text ?? "").trim()
+    || JSON.stringify(value?.resolutions ?? {}) !== JSON.stringify(rules.aiInstructions?.resolutions ?? {})
+    || (value?.parsedBy === "rules+ai" && rules.aiInstructions?.parsedBy !== "rules+ai");
+  useEffect(() => {
+    void call<{ settings: { provider: string } }>("ai.get").then((x) => setAi(x.settings.provider !== "none")).catch(() => setAi(false));
+  }, []);
+  useEffect(() => setValue(rules.aiInstructions), [JSON.stringify(rules.aiInstructions ?? null)]);
+  return (
+    <section className="card card-highlight" aria-labelledby="ai-instr" id="ai-instructions">
+      <div className="card-header"><h2 id="ai-instr">{L("Дополнительные инструкции для ИИ", "Additional instructions for AI")}</h2></div>
+      <div className="card-body stack">
+        <p className="help">{L(
+          "Напишите своими словами, что учитывать: какие площадки не использовать, какие страны и языки рассматривать, какой формат искать, чего избегать. Инструкции сохраняются в этом профиле и применяются при каждом поиске, в том числе по расписанию.",
+          "Say in your own words what to take into account: which sites not to use, which countries and languages to consider, which format to look for, what to avoid. The instructions are saved in this profile and applied on every search, including scheduled ones.",
+        )}</p>
+        <AiInstructionsEditor rules={rules} value={value} aiConnected={aiConnected} onChange={(v, o) => { setValue(v); setOpen(o); }} />
+        <div className="row">
+          <button className="btn btn-primary" disabled={!dirty || open > 0 || busy === "instr"} onClick={() => run("instr", async () => {
+            const r = await call<{ version: number; reassessed: number }>("profile.saveRules", { candidateId, rules: { ...rules, aiInstructions: value }, note: value ? L("Инструкции для ИИ", "AI instructions") : L("Инструкции очищены", "Instructions cleared") });
+            push(value ? L(`Сохранено. Пересчитано вакансий: ${r.reassessed}. Применится и к следующим поискам.`, `Saved. Jobs re-assessed: ${r.reassessed}. Applies to future searches too.`) : L("Инструкции очищены", "Instructions cleared"));
+            onSaved();
+          })}>{L("Сохранить инструкции", "Save instructions")}</button>
+          {open > 0 && <span className="small subtle">{L("Сначала выберите, что главнее, в противоречиях выше", "First choose which one wins in the conflicts above")}</span>}
+        </div>
+      </div>
+    </section>
   );
 }

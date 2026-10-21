@@ -5,7 +5,7 @@ import { convertWindow, parseWorkingHours } from "../src/core/timezone";
 import { extractFacts } from "../src/core/facts";
 import { classifyPosting } from "../src/core/classify";
 import { interpretCheck } from "../src/core/lifecycle";
-import { blockedReason, canonicalizeUrl, DEFAULT_EXCLUDED_HOSTS, safeExternalUrl } from "../src/core/policy";
+import { blockedReason, canonicalizeUrl, DEFAULT_EXCLUDED_HOSTS, safeExternalUrl, SERVICE_FAMILIES } from "../src/core/policy";
 import { decideDedupe, fallbackKey, type DedupeIndex, type VacRef } from "../src/core/dedupe";
 import { planSchedule } from "../src/core/schedule";
 import { NOW, rulesRu, vac } from "./helpers";
@@ -257,9 +257,16 @@ describe("жизненный цикл объявления", () => {
   });
 });
 
-describe("политика исключённых источников", () => {
-  const ex = DEFAULT_EXCLUDED_HOSTS;
-  it("hh.ru блокируется во всех формах", () => {
+describe("исключённые источники — только по выбору пользователя", () => {
+  const family = SERVICE_FAMILIES.find((f) => f.id === "headhunter")!;
+  const ex = family.hosts.map((host) => ({ host, reason: "Исключено пользователем" }));
+  it("по умолчанию ничего не исключено: hh.ru доступен", () => {
+    expect(DEFAULT_EXCLUDED_HOSTS).toEqual([]);
+    expect(blockedReason("https://hh.ru/vacancy/1", DEFAULT_EXCLUDED_HOSTS)).toBeNull();
+    expect(safeExternalUrl("https://hh.ru/vacancy/1", DEFAULT_EXCLUDED_HOSTS).ok).toBe(true);
+    expect(() => vac({ title: "X", description: "y", url: "https://hh.ru/vacancy/5" })).not.toThrow();
+  });
+  it("исключённое пользователем семейство блокируется во всех формах", () => {
     expect(blockedReason("https://hh.ru/vacancy/1", ex)).toBeTruthy();
     expect(blockedReason("https://samara.hh.ru/vacancy/1", ex)).toBeTruthy();
     expect(blockedReason("https://redirect.example.com/?url=https%3A%2F%2Fhh.ru%2Fvacancy%2F1", ex)).toBeTruthy();
@@ -271,9 +278,9 @@ describe("политика исключённых источников", () => {
     expect(blockedReason("https://shh.ru/x", ex)).toBeNull();
     expect(blockedReason("https://career.habr.com/vacancies/1", ex)).toBeNull();
   });
-  it("запрещённые запись не попадает в базу, внешняя ссылка не открывается", () => {
-    expect(() => vac({ title: "X", description: "y", url: "https://hh.ru/vacancy/5" })).toThrow();
-    expect(() => vac({ title: "X", description: "Apply at https://hh.ru/vacancy/5 please" })).toThrow();
+  it("исключённая запись не попадает в базу, внешняя ссылка не открывается", () => {
+    expect(() => vac({ title: "X", description: "y", url: "https://hh.ru/vacancy/5" }, ex)).toThrow();
+    expect(() => vac({ title: "X", description: "Apply at https://hh.ru/vacancy/5 please" }, ex)).toThrow();
     expect(safeExternalUrl("https://hh.ru/vacancy/1", ex).ok).toBe(false);
     expect(safeExternalUrl("javascript:alert(1)", ex).ok).toBe(false);
     expect(safeExternalUrl("file:///etc/passwd", ex).ok).toBe(false);

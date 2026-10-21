@@ -19,7 +19,7 @@ const check = (name, ok, detail = "") => {
 async function launch() {
   // E2E_EXECUTABLE — путь к собранному бинарнику (проверка упакованного приложения), иначе запуск из исходников.
   const exe = process.env.E2E_EXECUTABLE;
-  const app = await electron.launch({ ...(exe ? { executablePath: exe, args: [] } : { args: ["."] }), env: { ...process.env, JSD_USER_DATA: dataDir, LANG: lang === "ru" ? "ru_RU.UTF-8" : "en_US.UTF-8" } });
+  const app = await electron.launch({ ...(exe ? { executablePath: exe, args: [] } : { args: ["."] }), env: { ...process.env, JSD_USER_DATA: dataDir, JSD_NO_OS_TASK: "1", LANG: lang === "ru" ? "ru_RU.UTF-8" : "en_US.UTF-8" } });
   const win = await app.firstWindow();
   const errors = [];
   win.on("pageerror", (e) => errors.push(String(e)));
@@ -63,6 +63,10 @@ try {
   await win.getByLabel(L("Минимальная оплата в месяц", "Minimum pay per month"), { exact: true }).fill("600");
   await win.getByLabel(L("Валюта", "Currency"), { exact: true }).selectOption("USD");
   await win.getByLabel(L("Без обязательных звонков по телефону", "No mandatory phone calls")).check();
+  // Дополнительные инструкции для ИИ: свои слова → понятный разбор
+  await win.locator("textarea.instr-text").fill(L("Не используй hh.ru и связанные сервисы", "Don't use hh.ru and related services"));
+  await win.locator(".instr-parsed .mark", { hasText: "hh.ru" }).first().waitFor({ timeout: 5000 }).catch(() => {});
+  check("onboarding instructions are parsed (hh.ru excluded)", (await win.locator(".instr-parsed .mark", { hasText: "hh.ru" }).count()) >= 1);
   await shot(win, "03-onboarding-wishes");
   await win.getByRole("button", { name: L("Сохранить и продолжить", "Save and continue") }).click();
   await win.getByRole("heading", { name: L("Где искать вакансии", "Where to look for jobs") }).waitFor();
@@ -169,6 +173,22 @@ try {
   await win.waitForTimeout(600);
   check("CV draft created", (await win.getByText(lang === "ru" ? "Резюме (черновик)" : "CV (draft)").count()) >= 1);
 
+  // Инструкции в профиле: противоречие с настройками решает человек
+  const instr = win.locator("textarea.instr-text");
+  await instr.fill(L("Только офис. Без продаж", "Office only. No sales"));
+  await win.locator(".instr-conflict").first().waitFor({ timeout: 5000 }).catch(() => {});
+  const saveInstr = win.getByRole("button", { name: L("Сохранить инструкции", "Save instructions") });
+  check("instruction conflict shown and blocks saving", (await win.locator(".instr-conflict").count()) >= 1 && (await saveInstr.isDisabled()));
+  await win.locator(".instr-conflict").first().getByLabel(L("Главнее настройки профиля", "The profile settings win")).check();
+  await shot(win, "14b-profile-instructions");
+  check("conflict resolved enables saving", await saveInstr.isEnabled());
+  await saveInstr.click();
+  await win.waitForTimeout(900);
+  const savedRules = await win.evaluate(async () => (await window.jsd.call("profile.get", { candidateId: "cand-demo" })).data.profile.rules.aiInstructions);
+  check("instructions saved in the profile version", savedRules?.resolutions?.format === "settings" && savedRules?.parsed?.excludeKeywords?.length >= 1, JSON.stringify(savedRules?.parsed?.excludeKeywords));
+  const dims = await win.evaluate(async () => { const l = (await window.jsd.call("vacancies.list", { candidateId: "cand-demo" })).data; const d = (await window.jsd.call("vacancies.get", { candidateId: "cand-demo", vacancyId: l[0].id })).data; return (d.assessment?.dimensions ?? []).map((x) => x.key); }).catch((e) => [String(e)]);
+  check("instructions take part in assessment", dims.includes("instructions"), dims.join(","));
+
   // Настройки
   await win.locator("nav.sidebar").getByRole("button", { name: lang === "ru" ? "Настройки" : "Settings", exact: true }).click();
   for (const tab of lang === "ru" ? ["Поиск и расписание", "Источники", "AI", "Приватность", "Журнал"] : ["Search & schedule", "Sources", "AI", "Privacy", "Log"]) {
@@ -176,10 +196,17 @@ try {
     await win.waitForTimeout(400);
     await shot(win, `15-settings-${tab.replace(/[^a-zA-Zа-яА-Я]+/g, "-").toLowerCase()}`);
   }
+  await win.getByRole("tab", { name: lang === "ru" ? "Источники" : "Sources" }).click();
+  await win.locator("#source-access").waitFor({ timeout: 8000 }).catch(() => {});
+  check("source access panel for hh.ru and Adzuna", await win.locator("#source-access").isVisible() && (await win.locator("#source-access h3", { hasText: "hh.ru" }).count()) === 1);
   await win.getByRole("tab", { name: lang === "ru" ? "Поиск и расписание" : "Search & schedule" }).click();
   await win.getByLabel(lang === "ru" ? "Регулярный поиск" : "Regular search").click();
   await win.waitForTimeout(500);
   check("schedule shows next run", await win.getByText(lang === "ru" ? "Следующий запуск" : "Next run").first().isVisible());
+  check("schedule has time zone and closed-app option", await win.getByLabel(L("Часовой пояс", "Time zone")).isVisible() && (await win.getByText(L("Искать, даже когда приложение закрыто", "Search even when the app is closed")).count()) === 1);
+  await win.locator("#cloud").scrollIntoViewIfNeeded();
+  check("search server panel visible", await win.locator("#cloud").isVisible());
+  await shot(win, "15b-settings-cloud");
 
   // Размеры окна
   for (const [w, h, n] of [[960, 640, "small"], [1600, 1000, "large"]]) {

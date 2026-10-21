@@ -5,7 +5,7 @@ import { Repo } from "../db/repo";
 import { runSearch } from "../pipeline/run";
 import type { RunTrigger } from "../shared/types";
 
-const { dbPath, trigger, sourceIds } = workerData as { dbPath: string; trigger: RunTrigger; sourceIds?: string[] };
+const { dbPath, trigger, sourceIds, credentials } = workerData as { dbPath: string; trigger: RunTrigger; sourceIds?: string[]; credentials?: { hhToken: string | null; adzuna: { appId: string; appKey: string } | null } };
 const ac = new AbortController();
 parentPort?.on("message", (m) => {
   if (m?.type === "cancel") ac.abort();
@@ -18,6 +18,7 @@ parentPort?.on("message", (m) => {
     const r = await runSearch(repo, trigger, {
       signal: ac.signal,
       sourceIds,
+      credentials,
       onProgress: (p) => parentPort?.postMessage({ type: "progress", ...p }),
     });
     parentPort?.postMessage({ type: "done", ...r });
