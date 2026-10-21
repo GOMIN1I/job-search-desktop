@@ -94,8 +94,8 @@
 
 ## Что проверено, а что нет
 
-- **macOS (Apple Silicon):** собранный `.dmg` установлен и запущен; автотесты окна (E2E) пройдены на русском и английском для исходников и собранного приложения; замерена производительность. Установка Ollama и загрузка модели проверены на настоящем движке: остановка на 35 %, продолжение, проверка, удаление.
-- **Windows:** установщик собирается в GitHub Actions на `windows-latest`, там же запускаются E2E и замер производительности собранного приложения. На настоящем компьютере с Windows установщик вручную не проверялся.
+- **macOS (Apple Silicon):** `.dmg` скачан из релиза по ссылке выше, смонтирован и проверен; автотесты окна (E2E) против приложения из него пройдены на русском и английском (24 из 24); замерена производительность. Установка Ollama и загрузка модели проверены на настоящем движке: остановка на 35 %, продолжение, проверка, удаление.
+- **Windows:** установщик собирается в GitHub Actions на `windows-latest`; там же E2E против собранного приложения (23 из 23; шаг с настоящей моделью пропущен, на сервере нет Ollama) и замер производительности. На физическом компьютере с Windows установщик вручную не запускался, установка Ollama на Windows не проверялась.
 - Сборки не подписаны и не нотаризованы.
 
 ## Чего нет
@@ -152,6 +152,6 @@ Tell the app once what works for you: country, languages, job areas, minimum pay
 - **Local AI, free:** install Ollama and Gemma 4 E2B (≈ 4.6 GB, 8 GB RAM) or E4B (≈ 6.6 GB, 16 GB RAM) from inside the app. You see size and requirements first, get a recommendation, and confirm before anything large downloads. Progress, pause and resume, verification, and removal are built in. With a local model, posting text and your profile never leave your computer. Cloud models (Anthropic or any OpenAI-compatible API) are optional.
 - **Install on macOS:** open the `.dmg`, drag the app to Applications. The build is not signed yet: open it once, then go to System Settings, Privacy & Security, and click Open Anyway. Requires macOS 13+ on Apple Silicon.
 - **Install on Windows:** run the installer; SmartScreen will warn because it is unsigned: click More info, then Run anyway. Requires Windows 10 or 11, 64-bit.
-- **Verified:** the macOS build was installed and run, with E2E tests (RU and EN) and performance measured. The Windows installer is built and E2E-tested on GitHub Actions `windows-latest`; it has not been checked by hand on a physical Windows PC.
+- **Verified:** the released macOS `.dmg` was downloaded, mounted and passed E2E tests in RU and EN (24/24), with performance measured. The Windows build and E2E tests (23/23) run on GitHub Actions `windows-latest`; the installer has not been run on a physical Windows PC, and installing Ollama on Windows has not been tested.
 
 Development: `npm ci && npm test && npm start`. License: MIT.
