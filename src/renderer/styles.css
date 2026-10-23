@@ -395,10 +395,11 @@ details.more[open] > summary::after { content: "−"; }
 details.more > div { padding: 4px 0 18px; }
 
 /* ---------- AI-модели ---------- */
-.models { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.models { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; }
 @media (max-width: 760px) { .models { grid-template-columns: 1fr; } }
 .model { display: flex; flex-direction: column; gap: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); transition: border-color 160ms, box-shadow 160ms; }
 .model.recommended { border-color: var(--pine); box-shadow: 0 0 0 3px var(--pine-weak); }
+.model-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .model h3 { font-size: 16px; font-weight: 640; }
 .model .facts { display: flex; flex-wrap: wrap; gap: 6px; }
 .model .actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: auto; }

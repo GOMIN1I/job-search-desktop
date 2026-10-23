@@ -14,18 +14,38 @@ import { EXTRACT_JSON_SCHEMA, EXTRACT_SYSTEM, ExtractSchema, extractUserPrompt }
 export const OLLAMA_BASE = "http://127.0.0.1:11434";
 
 export interface CatalogModel {
-  id: "light" | "quality";
+  id: "light" | "quality" | "installed";
   model: string; // имя в Ollama
   title: string;
-  minRamGb: number;
-  sizeBytes: number | null; // по манифесту реестра
+  minRamGb: number | null;
+  sizeBytes: number | null; // из Ollama для установленной модели, иначе из реестра
   licenseUrl: string;
+  runtime?: "ollama" | "mlx";
 }
 
 export const CATALOG: Array<Omit<CatalogModel, "sizeBytes">> = [
   { id: "light", model: "gemma4:e2b", title: "Gemma 4 E2B", minRamGb: 8, licenseUrl: "https://ollama.com/library/gemma4" },
   { id: "quality", model: "gemma4:e4b", title: "Gemma 4 E4B", minRamGb: 16, licenseUrl: "https://ollama.com/library/gemma4" },
 ];
+
+/** Keep installed Gemma variants selectable under their exact local tag; never invent a registry download. */
+export function withInstalledGemma(models: CatalogModel[], installed: EngineStatus["models"]): CatalogModel[] {
+  const sizes = new Map(installed.map((local) => [local.name, local.size]));
+  const result = models.map((model) => ({ ...model, sizeBytes: sizes.get(model.model) ?? model.sizeBytes }));
+  const known = new Set(result.map((model) => model.model));
+  for (const local of installed) {
+    if (!local.name.startsWith("gemma4:") || known.has(local.name)) continue;
+    const mlx = /(?:^|[-:])mlx(?:$|-)/i.test(local.name);
+    result.push({
+      id: "installed", model: local.name,
+      title: local.name === "gemma4:12b-mlx" ? "Gemma 4 12B" : local.name === "gemma4:e12b" ? "Gemma 4 E12B" : local.name,
+      minRamGb: null, sizeBytes: local.size, runtime: mlx ? "mlx" : "ollama",
+      licenseUrl: "https://ollama.com/library/gemma4",
+    });
+    known.add(local.name);
+  }
+  return result;
+}
 
 export interface EngineStatus {
   state: "running" | "stopped" | "missing";
