@@ -78,20 +78,26 @@
 - **hh.ru** с апреля 2026 года отдаёт поиск вакансий только с OAuth-токеном. Чтобы искать там, в «Настройках», раздел «Источники», введите данные приложения, зарегистрированного на [dev.hh.ru](https://dev.hh.ru), и войдите через свой аккаунт hh.ru. Источник включается после успешного проверочного поиска.
 - **Adzuna** требует бесплатный ключ разработчика ([developer.adzuna.com](https://developer.adzuna.com)).
 - **Поиск при выключенном компьютере** работает через сервер поиска. Подключите его в «Настройках», раздел «Поиск и расписание». Свой сервер разворачивается по [инструкции](server/README.md). На сервер уходят ваши профили поиска, выбранные источники и расписание; доступы к hh.ru и Adzuna — только если вы это разрешите.
-- **Нейросеть локально.** Лёгкой модели нужно от 8 ГБ памяти и около 4,6 ГБ на диске, точной — от 16 ГБ памяти и около 6,6 ГБ. Размер и требования видны до загрузки.
+- **Нейросеть локально.** На выбор E2B, E4B, обычная 12B и 12B MLX для Apple Silicon. Модели скачиваются отдельно; размер виден перед загрузкой.
 
 ## Нейросеть: локально и бесплатно
 
-| Модель | Загрузка | Память | Кому подходит |
-|---|---|---|---|
-| **Лёгкая:** Gemma 4 E2B | ≈ 4,6 ГБ | от 8 ГБ | ноутбуки, быстрее отвечает |
-| **Точнее:** Gemma 4 E4B | ≈ 6,6 ГБ | от 16 ГБ | точнее с деталями, медленнее |
+Все четыре варианта доступны в «Настройках → AI» и при первом запуске. Выберите модель и нажмите «Установить»: веса скачиваются отдельно, в установщик приложения они не входят. Уже установленная модель доступна без повторной загрузки.
+
+| Модель / точный тег Ollama | Система | Примерная загрузка |
+|---|---|---|
+| **Gemma 4 E2B** · `gemma4:e2b` | Windows, macOS · от 8 ГБ памяти | 4,6–7,5 ГБ |
+| **Gemma 4 E4B** · `gemma4:e4b` | Windows, macOS · от 16 ГБ памяти | 6,6–9,5 ГБ |
+| **Gemma 4 12B** · `gemma4:12b` | Windows, macOS · обычная версия Ollama | ≈ 8 ГБ |
+| **Gemma 4 12B MLX** · `gemma4:12b-mlx` | Только Mac с Apple Silicon | ≈ 7,7 ГБ |
+
+Для 12B ориентируйтесь на 16 ГБ оперативной/объединённой памяти или видеопамяти и больше; скорость зависит от компьютера и настроек. MLX нельзя установить на Windows или Intel Mac. Размеры могут меняться: приложение читает актуальный размер из [реестра Ollama](https://ollama.com/library/gemma4/tags) перед загрузкой.
 
 Приложение рекомендует модель под ваш компьютер и ничего большого не скачивает без подтверждения. Загрузку можно остановить и продолжить; после загрузки модель проверяется и включается, удаляется одной кнопкой. С локальной моделью текст вакансий и ваш профиль обрабатываются только на вашем компьютере. Облачная модель (Anthropic или любой OpenAI-совместимый сервис) подключается отдельно, по вашему ключу.
 
 ## Приватность
 
-Приложение ходит в сеть только к выбранным сайтам с вакансиями, к выбранной модели (если она облачная), к странице вакансии, когда вы нажимаете «Перепроверить», и к серверу поиска, если вы его подключили. Оно не отправляет отклики, письма и формы, не регистрирует аккаунты и не проходит тесты за вас.
+Для установки движка и моделей приложение обращается к GitHub/Ollama. При дальнейшей работе оно ходит в сеть к выбранным сайтам с вакансиями, к выбранной модели (если она облачная), к странице вакансии, когда вы нажимаете «Перепроверить», и к серверу поиска, если вы его подключили. Оно не отправляет отклики, письма и формы, не регистрирует аккаунты и не проходит тесты за вас.
 
 ## Разработка
 
@@ -117,7 +123,7 @@ npm start
 
 ## Лицензия
 
-Код: MIT, см. [LICENSE](LICENSE). Шрифт Golos Text: SIL OFL 1.1. Модели Gemma — на условиях [Gemma Terms of Use](https://ollama.com/library/gemma4); Ollama: MIT.
+Код: MIT, см. [LICENSE](LICENSE). Шрифт Golos Text: SIL OFL 1.1. Модели Gemma 4 — [Apache 2.0](https://blog.google/innovation-and-ai/technology/developers-tools/introducing-gemma-4-12b/); Ollama: MIT.
 
 ---
 
@@ -133,7 +139,17 @@ Job hunting means opening dozens of sites every day and checking whether each po
 - **Wide search:** search by your job areas with pagination across Himalayas, The Muse, Arbeitnow, Jobicy, Remotive, Remote OK, Working Nomads, We Work Remotely, Habr Career and Greenhouse/Lever/Ashby company boards; hh.ru and Adzuna (19 countries) connect with your own access. You choose the sources.
 - **Searches on its own:** daily or weekly in your time zone. When the app is closed, the system runs the search and notifies you; after sleep it runs on wake-up. With a search server it also runs while the computer is off.
 - **Documents:** import PDF and DOCX (text is extracted; scans are flagged for OCR), export to DOCX, PDF, HTML, Markdown and TXT.
-- **Local AI, free:** Ollama and Gemma 4 install from inside the app.
+- **Local AI, free:** choose and install Ollama + Gemma 4 from Settings → AI or during onboarding. Model weights download separately; they are not bundled with the app.
+
+| Available model | Ollama tag | Platform | Approx. download |
+|---|---|---|---|
+| Gemma 4 E2B | `gemma4:e2b` | Windows, macOS · 8 GB+ RAM | 4.6–7.5 GB |
+| Gemma 4 E4B | `gemma4:e4b` | Windows, macOS · 16 GB+ RAM | 6.6–9.5 GB |
+| Gemma 4 12B | `gemma4:12b` | Windows, macOS · standard Ollama | ~8 GB |
+| Gemma 4 12B MLX | `gemma4:12b-mlx` | Apple Silicon Macs only | ~7.7 GB |
+
+For 12B, plan for at least 16 GB of RAM/unified memory or VRAM; speed depends on hardware and settings. Installed Gemma variants are detected automatically. The app shows current download sizes from Ollama and checks the model before enabling it.
+
 - **Install on macOS:** open the `.dmg` and drag the app to Applications. It is not signed yet: open it once, then go to System Settings, Privacy & Security, and click Open Anyway. Requires Apple Silicon and macOS 13+.
 - **Install on Windows:** run the installer; SmartScreen will warn because it is not signed yet: click More info, then Run anyway. Requires Windows 10 or 11, 64-bit.
 - **Good to know:** hh.ru requires an OAuth token since April 2026 (an app registered at dev.hh.ru plus your hh.ru sign-in); Adzuna needs a free developer key; searching while the computer is off needs a search server ([guide](server/README.md)).

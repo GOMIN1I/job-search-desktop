@@ -1,6 +1,6 @@
 {
   "name": "job-search-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Desktop app that collects jobs from supported sources, checks conditions honestly and helps you apply manually.",
   "main": "dist/main/main.js",
   "scripts": {

@@ -179,7 +179,7 @@ function AiTab() {
   }, [app.version]);
   if (!d || !form) return null;
   const s = d.settings;
-  const presets = form.provider === "anthropic" ? ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"] : form.provider === "openai_compatible" ? ["gemma4:e4b", "gemma4:e2b", "gpt-5-mini", "llama3.2"] : [];
+  const presets = form.provider === "anthropic" ? ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"] : form.provider === "openai_compatible" ? ["gemma4:e4b", "gemma4:e2b", "gemma4:12b", "gemma4:12b-mlx", "gpt-5-mini", "llama3.2"] : [];
   return (
     <div className="stack-lg">
       <section className="card"><div className="card-body stack-lg">

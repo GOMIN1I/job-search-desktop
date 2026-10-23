@@ -28,7 +28,7 @@ import { applyBackup, applyProfileImport, applyVacancyImport, exportBackup, prev
 import { toCsv } from "../importexport/csv";
 import { loadDemo } from "../demo/demo";
 import { backupTo, SCHEMA_VERSION, timestampSlug } from "../db/db";
-import { CATALOG, OLLAMA_BASE, OllamaManager } from "./ollama";
+import { CATALOG, OLLAMA_BASE, OllamaManager, withInstalledGemma } from "./ollama";
 
 export interface Platform {
   dataDir: string;
@@ -812,7 +812,7 @@ export function createApi(repo: Repo, platform: Platform, creds: CredentialStore
     "models.state": async () => {
       const [status, catalog, engine] = await Promise.all([ollama.status(), ollama.catalog(), ollama.engineInfo()]);
       const s = aiSettings();
-      return { status, catalog, engine, active: s.provider === "openai_compatible" && s.baseUrl.includes("11434") ? s.model : null, platform: platform.platform };
+      return { status, catalog: { ...catalog, models: withInstalledGemma(catalog.models, status.models) }, engine, arch: process.arch, active: s.provider === "openai_compatible" && s.baseUrl.includes("11434") ? s.model : null, platform: platform.platform };
     },
     "models.installEngine": () => {
       background("engine", () => ollama.installEngine().then(() => changed("models")));

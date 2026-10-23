@@ -3,11 +3,28 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { OllamaManager, type JobProgress } from "../src/main/ollama";
+import { CATALOG, OllamaManager, withInstalledGemma, type JobProgress } from "../src/main/ollama";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "jsd-oll-"));
 
 describe("менеджер локальных моделей", () => {
+  it("показывает установленные 12B MLX и E12B под точными тегами, без дублей и посторонних моделей", () => {
+    const base = CATALOG.map((model) => ({ ...model, sizeBytes: null }));
+    const result = withInstalledGemma(base, [
+      { name: "gemma4:e2b", size: 7e9 },
+      { name: "gemma4:12b-mlx", size: 7714091504 },
+      { name: "gemma4:12b-mlx", size: 7714091504 },
+      { name: "gemma4:e12b", size: 8e9 },
+      { name: "nomic-embed-text:latest", size: 2e8 },
+    ]);
+    expect(result.map((model) => model.model)).toEqual(["gemma4:e2b", "gemma4:e4b", "gemma4:12b", "gemma4:12b-mlx", "gemma4:e12b"]);
+    expect(result[0].sizeBytes).toBe(7e9);
+    expect(result[3]).toMatchObject({ id: "large_mlx", title: "Gemma 4 12B", runtime: "mlx", minRamGb: null, sizeBytes: 7714091504 });
+    expect(result[4]).toMatchObject({ title: "Gemma 4 E12B", runtime: "ollama" });
+    expect(base).toHaveLength(4);
+    expect(withInstalledGemma(base, [])).toEqual(base);
+  });
+
   it("скачивание продолжается после обрыва (Range) и проверяется SHA-256", async () => {
     const dir = tmp();
     const data = Buffer.from("x".repeat(5000) + "y".repeat(5000));
@@ -88,6 +105,17 @@ describe("менеджер локальных моделей", () => {
     await expect(m.pull("some/other-model")).rejects.toThrow(/поддержанных/);
   });
 
+  it("обычная 12B скачивается на Windows, MLX отклоняется до запроса к серверу", async () => {
+    const requests: string[] = [];
+    const m = new OllamaManager({ downloadsDir: tmp(), emit: () => {}, platform: "win32", fetcher: (async (_url, init) => {
+      requests.push(JSON.parse(init!.body as string).model);
+      return new Response('{"status":"success"}\n');
+    }) as typeof fetch });
+    await m.pull("gemma4:12b");
+    await expect(m.pull("gemma4:12b-mlx")).rejects.toThrow(/Apple Silicon/);
+    expect(requests).toEqual(["gemma4:12b"]);
+  });
+
   it("ошибка Ollama при загрузке — понятная ошибка, а не тихий успех", async () => {
     const dir = tmp();
     const events: JobProgress[] = [];
@@ -100,7 +128,7 @@ describe("менеджер локальных моделей", () => {
     const dir = tmp();
     const m = new OllamaManager({ downloadsDir: dir, emit: () => {}, home: dir, fetcher: (async () => Response.json({ layers: [{ size: 1e9 }, { size: 5e8 }] })) as typeof fetch });
     const c = await m.catalog();
-    expect(c.models).toHaveLength(2);
+    expect(c.models).toHaveLength(4);
     expect(c.models[0].sizeBytes).toBe(1.5e9);
     expect(["light", "quality"]).toContain(c.recommended);
   });

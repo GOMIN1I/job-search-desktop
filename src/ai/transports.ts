@@ -134,6 +134,8 @@ export class OpenAICompatibleTransport implements AiTransport {
         body: JSON.stringify({
           model: this.model,
           max_tokens: req.maxTokens,
+          // Gemma uses the same token budget for reasoning and JSON; extraction needs the final answer.
+          ...(/^gemma4(?::|$)/.test(this.model) && ["localhost", "127.0.0.1", "[::1]"].includes(new URL(this.baseUrl).hostname) && new URL(this.baseUrl).port === "11434" ? { reasoning_effort: "none" } : {}),
           temperature: 0,
           messages: [
             { role: "system", content: req.system },

@@ -1,4 +1,4 @@
-// Выбор и установка локальной модели прямо в приложении: движок Ollama, две модели Gemma,
+// Выбор и установка локальной модели прямо в приложении: движок Ollama, модели Gemma,
 // размер и требования до скачивания, рекомендация для этого компьютера, прогресс, продолжение, удаление, проверка.
 import { useEffect, useRef, useState } from "react";
 import type { Msg } from "../../shared/types";
@@ -7,13 +7,14 @@ import { call, on } from "../api";
 import { useApp } from "../state";
 import { Icon, Modal, Spinner, useBusy } from "./ui";
 
-interface CatalogModel { id: "light" | "quality"; model: string; title: string; minRamGb: number; sizeBytes: number | null; licenseUrl: string }
+interface CatalogModel { id: "light" | "quality" | "large" | "large_mlx" | "installed"; model: string; title: string; minRamGb: number | null; sizeBytes: number | null; licenseUrl: string; runtime?: "ollama" | "mlx" }
 interface State {
   status: { state: "running" | "stopped" | "missing"; version: string | null; models: Array<{ name: string; size: number }> };
   catalog: { models: CatalogModel[]; ramGb: number; diskFree: number | null; recommended: "light" | "quality" };
   engine: { size: number; version: string; name: string } | null;
   active: string | null;
   platform: string;
+  arch: string;
 }
 interface Progress { job: string; phase: string; completed?: number; total?: number; message?: Msg; verified?: { ok: boolean; seconds: number; error: string | null }; rate?: number }
 
@@ -100,18 +101,20 @@ export function LocalModels({ onReady }: { onReady?: (model: string) => void }) 
           const working = p && !["done", "error", "cancelled"].includes(p.phase);
           const isInstalled = installed(cm.model);
           const recommended = st.catalog.recommended === cm.id;
-          const heavy = st.catalog.ramGb < cm.minRamGb;
+          const heavy = cm.minRamGb !== null && st.catalog.ramGb < cm.minRamGb;
+          const compatible = cm.runtime !== "mlx" || (st.platform === "darwin" && st.arch === "arm64");
           const noDisk = cm.sizeBytes && st.catalog.diskFree !== null && st.catalog.diskFree < cm.sizeBytes * 1.15;
           return (
-            <div key={cm.id} className={`model${recommended ? " recommended" : ""}`}>
-              <h3>{cm.id === "light" ? t("ai.model.light") : t("ai.model.quality")} — {cm.title}</h3>
-              <p className="small subtle">{cm.id === "light" ? t("ai.model.light.d") : t("ai.model.quality.d")}</p>
+            <div key={cm.model} data-model={cm.model} className={`model${recommended ? " recommended" : ""}`}>
+              <div className="model-heading"><h3>{cm.title}</h3><span className="badge b-neutral">{cm.runtime === "mlx" ? "Apple Silicon · MLX" : "macOS · Windows · Linux"}</span></div>
+              <p className="small subtle">{cm.runtime === "mlx" ? t("ai.model.mlx.d") : cm.id === "large" ? t("ai.model.large.d") : cm.id === "installed" ? t("ai.model.local.d") : cm.id === "light" ? t("ai.model.light.d") : t("ai.model.quality.d")}</p>
               <div className="facts">
-                <span className="badge">{t("ai.model.download", { size: gb(cm.sizeBytes) })}</span>
-                <span className="badge">{t("ai.model.needRam", { ram: cm.minRamGb })}</span>
+                <span className="badge">{isInstalled ? `${t("ai.model.installed")} · ${gb(cm.sizeBytes)}` : t("ai.model.download", { size: gb(cm.sizeBytes) })}</span>
+                {cm.minRamGb !== null && <span className="badge">{t("ai.model.needRam", { ram: cm.minRamGb })}</span>}
                 <span className="badge b-neutral">{t("ai.model.yourRam", { ram: st.catalog.ramGb })}</span>
               </div>
               {recommended && !heavy && <span className="verdict v-yes" style={{ alignSelf: "flex-start" }}><Icon.check />{t("ai.model.recommended")}</span>}
+              {!compatible && <span className="small subtle">{t("ai.model.mlx.only")}</span>}
               {heavy && <span className="verdict v-ask" style={{ alignSelf: "flex-start" }}><Icon.question />{t("ai.model.tooHeavy")}</span>}
               {noDisk && !isInstalled && <span className="small" style={{ color: "var(--danger)" }}>{t("ai.model.noDisk", { need: gb((cm.sizeBytes ?? 0) * 1.15), free: gb(st.catalog.diskFree) })}</span>}
               {working && (
@@ -123,14 +126,14 @@ export function LocalModels({ onReady }: { onReady?: (model: string) => void }) 
               {p?.phase === "done" && p.verified?.ok && <span className="small" style={{ color: "var(--pine)" }}>{t("ai.model.verified", { sec: p.verified.seconds })}</span>}
               {p?.phase === "error" && <span className="small" style={{ color: "var(--danger)" }}>{m(p.message)}</span>}
               <div className="actions-row">
-                {!isInstalled && !working && (
-                  <button className="btn btn-primary" disabled={st.status.state !== "running" || !!noDisk} onClick={() => setConfirm(cm)}>
+                {!isInstalled && cm.id !== "installed" && !working && (
+                  <button className="btn btn-primary" disabled={!compatible || st.status.state !== "running" || !!noDisk} onClick={() => setConfirm(cm)}>
                     {p?.phase === "error" || p?.phase === "cancelled" ? t("ai.model.resume") : t("ai.model.install")}
                   </button>
                 )}
                 {working && p.phase !== "verify" && <button className="btn" onClick={() => void call("models.cancel", { job: cm.model })}>{t("ai.model.cancel")}</button>}
                 {isInstalled && st.active === cm.model && <span className="verdict v-yes"><Icon.check />{t("ai.model.inUse")}</span>}
-                {isInstalled && st.active !== cm.model && !working && (
+                {isInstalled && compatible && st.active !== cm.model && !working && (
                   <button className="btn btn-primary" disabled={busy === `use-${cm.model}`} onClick={() => run(`use-${cm.model}`, async () => { await call("models.use", { model: cm.model }); onReady?.(cm.model); })}>
                     {busy === `use-${cm.model}` ? <><Spinner />{t("ai.model.verifying")}</> : t("ai.model.use")}
                   </button>
@@ -146,7 +149,7 @@ export function LocalModels({ onReady }: { onReady?: (model: string) => void }) 
       <p className="small muted">{t("ai.model.disk", { free: gb(st.catalog.diskFree) })}</p>
 
       {confirm && (
-        <Modal title={`${confirm.id === "light" ? t("ai.model.light") : t("ai.model.quality")} — ${confirm.title}`} onClose={() => setConfirm(null)} footer={<>
+        <Modal title={confirm.title} onClose={() => setConfirm(null)} footer={<>
           <button className="btn" onClick={() => setConfirm(null)}>{t("common.cancel")}</button>
           <button className="btn btn-primary" onClick={() => { const c = confirm; setConfirm(null); void run("pull", () => call("models.pull", { model: c.model })); }}>{t("ai.model.install")}</button>
         </>}>
