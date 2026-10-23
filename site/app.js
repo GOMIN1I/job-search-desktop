@@ -73,6 +73,10 @@
       if (!el.hasAttribute("data-ru")) el.setAttribute("data-ru", el.textContent.trim());
       el.textContent = lang === "en" ? el.getAttribute("data-en") : el.getAttribute("data-ru");
     });
+    document.querySelectorAll("[data-en-alt]").forEach(function (el) {
+      if (!el.hasAttribute("data-ru-alt")) el.setAttribute("data-ru-alt", el.getAttribute("alt"));
+      el.setAttribute("alt", el.getAttribute(lang === "en" ? "data-en-alt" : "data-ru-alt"));
+    });
     var b = document.getElementById("lang");
     b.textContent = lang === "en" ? "RU" : "EN";
     b.setAttribute("aria-label", lang === "en" ? "Переключить на русский" : "Switch to English");
