@@ -39,7 +39,7 @@ npm run dist:win        # NSIS, установка в профиль польз�
 
 ## Релизы
 
-Тег `vX.Y.Z` запускает `.github/workflows/release.yml`: сборка на macOS 14 и Windows и загрузка `Job-Search-Desktop-mac-arm64.dmg` и `Job-Search-Desktop-windows-x64-setup.exe` в GitHub Release с тем же тегом. Релиз нужно создать до окончания сборки (`gh release create vX.Y.Z --verify-tag`). Ссылки `releases/latest/download/<файл>` в README и на сайте всегда ведут на последний релиз.
+Тег `vX.Y.Z` запускает `.github/workflows/release.yml`: сборка на macOS 14 и Windows и загрузка `Job-Search-Desktop-mac-arm64.dmg` и `Job-Search-Desktop-windows-x64-setup.exe` в GitHub Release с тем же тегом. Сначала создайте черновик релиза (`gh release create vX.Y.Z --verify-tag --draft`). После успешной сборки обеих платформ проверьте наличие и контрольные суммы обоих установщиков, затем опубликуйте черновик (`gh release edit vX.Y.Z --draft=false --latest`). Ссылки `releases/latest/download/<файл>` в README и на сайте всегда ведут на последний релиз.
 
 ## Сервер поиска
 

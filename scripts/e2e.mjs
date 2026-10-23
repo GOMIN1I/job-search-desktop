@@ -73,9 +73,11 @@ try {
   await shot(win, "04-onboarding-sources");
   await win.getByRole("button", { name: L("Дальше", "Next"), exact: true }).click();
   await win.getByRole("heading", { name: L("Помощник для разбора вакансий", "An assistant to read job postings") }).waitFor();
-  await win.waitForTimeout(2500);
+  for (const model of ["gemma4:e2b", "gemma4:e4b", "gemma4:12b", "gemma4:12b-mlx"]) {
+    await win.locator(`.model[data-model="${model}"]`).waitFor({ timeout: 60000 });
+  }
   await shot(win, "05-onboarding-assistant");
-  check("assistant step shows two models", (await win.locator(".model").count()) === 2);
+  check("assistant step offers all four Gemma variants", (await win.locator(".model").count()) >= 4);
   // Если на машине уже есть Ollama с моделью — реально включаем её: приложение проверяет ответ на нашей задаче.
   const useBtn = win.locator(".model").first().getByRole("button", { name: L("Использовать", "Use"), exact: true });
   if (await useBtn.count()) {

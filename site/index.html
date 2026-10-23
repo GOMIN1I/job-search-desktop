@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0B5D4B">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="assets/fonts/golos-text-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 <a class="skip" href="#main" data-en="Skip to content">Перейти к содержанию</a>
@@ -144,12 +144,21 @@
     <div class="ai-models">
       <div class="model-row">
         <div><strong data-en="Light — Gemma 4 E2B">Лёгкая — Gemma 4 E2B</strong><span data-en="For laptops with 8–16 GB of memory">Для ноутбуков с 8–16 ГБ памяти</span></div>
-        <span class="size" id="size-e2b">4,6 ГБ</span>
+        <span class="size" data-en="4.6–7.5 GB">4,6–7,5 ГБ</span>
       </div>
       <div class="model-row">
         <div><strong data-en="More accurate — Gemma 4 E4B">Точнее — Gemma 4 E4B</strong><span data-en="For computers with 16 GB of memory or more">Для компьютеров с 16 ГБ памяти и больше</span></div>
-        <span class="size" id="size-e4b">6,6 ГБ</span>
+        <span class="size" data-en="6.6–9.5 GB">6,6–9,5 ГБ</span>
       </div>
+      <div class="model-row">
+        <div><strong>Gemma 4 12B</strong><span data-en="Windows and macOS · standard Ollama">Windows и macOS · обычная Ollama</span><code>gemma4:12b</code></div>
+        <span class="size" data-en="~8 GB">≈ 8 ГБ</span>
+      </div>
+      <div class="model-row">
+        <div><strong>Gemma 4 12B MLX</strong><span data-en="Apple Silicon Macs only">Только Mac с Apple Silicon</span><code>gemma4:12b-mlx</code></div>
+        <span class="size" data-en="~7.7 GB">≈ 7,7 ГБ</span>
+      </div>
+      <p class="fine" data-en="All four models are available in Settings → AI and during onboarding. Pick and install one: weights download separately and are not bundled with the app. Already installed models are detected automatically.">Все четыре модели доступны в «Настройках → AI» и при первом запуске. Выберите и установите нужную: веса скачиваются отдельно и не входят в установщик. Уже установленные модели приложение распознаёт само.</p>
       <p class="fine" data-en="Sizes come from the official Ollama registry; the app shows them again before downloading and recommends one for your computer.">Размеры — из официального реестра Ollama; приложение покажет их перед скачиванием и подскажет, что подходит вашему компьютеру.</p>
     </div>
   </section>
@@ -161,7 +170,7 @@
     <details><summary data-en="Does it search while my computer is off?">Ищет ли оно, когда компьютер выключен?</summary><p data-en="When the app is closed, the system starts the search on schedule; after sleep it runs once on wake-up. To search while the computer is off, connect a search server in Settings (you can deploy your own by following the guide in the repository): it runs your schedule in your time zone, and the app picks up the results when you open it.">Когда приложение закрыто, поиск по расписанию запускает система; если компьютер спал — один раз после пробуждения. Чтобы поиск шёл при выключенном компьютере, подключите в настройках сервер поиска (свой можно развернуть по инструкции в репозитории): он выполняет ваше расписание в вашем часовом поясе, а приложение забирает результаты, когда вы его откроете.</p></details>
     <details><summary data-en="Does it guarantee I will find a job?">Это гарантирует, что я найду работу?</summary><p data-en="No app can promise that. It saves time on reading and sorting and is honest about what is unknown, so you can spend your effort where it matters.">Никакое приложение не может это обещать. Оно экономит время на чтении и сортировке и честно показывает неизвестное — чтобы силы уходили туда, где есть смысл.</p></details>
     <details><summary data-en="Do I need an AI subscription?">Нужна ли подписка на нейросеть?</summary><p data-en="No. You can install a free local model inside the app or skip AI entirely. If you prefer a cloud model, you can add your own API key in Settings.">Нет. Можно установить бесплатную локальную модель прямо в приложении или обойтись без AI. Если хотите облачную модель — добавьте свой API-ключ в настройках.</p></details>
-    <details><summary data-en="What computer do I need?">Какой нужен компьютер?</summary><p data-en="A Mac with Apple Silicon (M1 or newer) on macOS 13+, or Windows 10/11 64-bit. The app itself needs about 300 MB; a local model needs 5–7 GB of disk space and 8–16 GB of memory.">Mac с Apple Silicon (M1 и новее) на macOS 13+ или Windows 10/11 64-бит. Самому приложению нужно около 300 МБ; локальной модели — 5–7 ГБ на диске и 8–16 ГБ памяти.</p></details>
+    <details><summary data-en="What computer do I need?">Какой нужен компьютер?</summary><p data-en="A Mac with Apple Silicon (M1 or newer) on macOS 13+, or Windows 10/11 64-bit. The app itself needs about 300 MB; local models download separately (about 4.6–9.5 GB). E2B starts at 8 GB of RAM, E4B at 16 GB. For 12B, plan for at least 16 GB of RAM/unified memory or VRAM; speed depends on hardware. MLX is only for Apple Silicon, while standard 12B also runs on Windows.">Mac с Apple Silicon (M1 и новее) на macOS 13+ или Windows 10/11 64-бит. Самому приложению нужно около 300 МБ; модели скачиваются отдельно (около 4,6–9,5 ГБ). Для E2B нужно от 8 ГБ памяти, для E4B — от 16 ГБ. Для 12B ориентируйтесь на 16 ГБ оперативной/объединённой памяти или видеопамяти и больше; скорость зависит от компьютера. MLX — только для Apple Silicon, обычная 12B работает и на Windows.</p></details>
     <details><summary data-en="Why does macOS or Windows warn me?">Почему macOS или Windows предупреждает?</summary><p data-en="The builds are not yet signed with a paid developer certificate. On a Mac, try to open the app once, then go to System Settings, Privacy &amp; Security, and click Open Anyway. On Windows, click More info, then Run anyway. The source code is open on GitHub.">Сборки пока не подписаны платным сертификатом разработчика. На Mac попробуйте открыть приложение, затем зайдите в «Системные настройки», раздел «Конфиденциальность и безопасность», и нажмите «Всё равно открыть». На Windows нажмите «Подробнее», затем «Выполнить в любом случае». Исходный код открыт на GitHub.</p></details>
     <details><summary data-en="Where is my data stored?">Где хранятся мои данные?</summary><p data-en="In your user folder on this computer. Keys are kept in the system keychain. You can export everything to a file at any time.">В папке пользователя на этом компьютере. Ключи — в системном хранилище паролей. Всё можно выгрузить в файл в любой момент.</p></details>
   </section>
@@ -189,6 +198,6 @@
   <a href="https://github.com/GOMIN1I/job-search-desktop/blob/main/LICENSE">MIT</a>
   <span data-en="You send every application yourself.">Каждый отклик вы отправляете сами.</span>
 </footer>
-<script src="app.js?v=4" defer></script>
+<script src="app.js?v=5" defer></script>
 </body>
 </html>

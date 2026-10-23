@@ -105,7 +105,7 @@ export function LocalModels({ onReady }: { onReady?: (model: string) => void }) 
           const compatible = cm.runtime !== "mlx" || (st.platform === "darwin" && st.arch === "arm64");
           const noDisk = cm.sizeBytes && st.catalog.diskFree !== null && st.catalog.diskFree < cm.sizeBytes * 1.15;
           return (
-            <div key={cm.model} className={`model${recommended ? " recommended" : ""}`}>
+            <div key={cm.model} data-model={cm.model} className={`model${recommended ? " recommended" : ""}`}>
               <div className="model-heading"><h3>{cm.title}</h3><span className="badge b-neutral">{cm.runtime === "mlx" ? "Apple Silicon · MLX" : "macOS · Windows · Linux"}</span></div>
               <p className="small subtle">{cm.runtime === "mlx" ? t("ai.model.mlx.d") : cm.id === "large" ? t("ai.model.large.d") : cm.id === "installed" ? t("ai.model.local.d") : cm.id === "light" ? t("ai.model.light.d") : t("ai.model.quality.d")}</p>
               <div className="facts">
