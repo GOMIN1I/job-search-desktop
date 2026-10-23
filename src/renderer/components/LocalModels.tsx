@@ -7,7 +7,7 @@ import { call, on } from "../api";
 import { useApp } from "../state";
 import { Icon, Modal, Spinner, useBusy } from "./ui";
 
-interface CatalogModel { id: "light" | "quality" | "installed"; model: string; title: string; minRamGb: number | null; sizeBytes: number | null; licenseUrl: string; runtime?: "ollama" | "mlx" }
+interface CatalogModel { id: "light" | "quality" | "large" | "large_mlx" | "installed"; model: string; title: string; minRamGb: number | null; sizeBytes: number | null; licenseUrl: string; runtime?: "ollama" | "mlx" }
 interface State {
   status: { state: "running" | "stopped" | "missing"; version: string | null; models: Array<{ name: string; size: number }> };
   catalog: { models: CatalogModel[]; ramGb: number; diskFree: number | null; recommended: "light" | "quality" };
@@ -107,7 +107,7 @@ export function LocalModels({ onReady }: { onReady?: (model: string) => void }) 
           return (
             <div key={cm.model} className={`model${recommended ? " recommended" : ""}`}>
               <div className="model-heading"><h3>{cm.title}</h3><span className="badge b-neutral">{cm.runtime === "mlx" ? "Apple Silicon · MLX" : "macOS · Windows · Linux"}</span></div>
-              <p className="small subtle">{cm.id === "installed" ? t(cm.runtime === "mlx" ? "ai.model.mlx.d" : "ai.model.local.d") : cm.id === "light" ? t("ai.model.light.d") : t("ai.model.quality.d")}</p>
+              <p className="small subtle">{cm.runtime === "mlx" ? t("ai.model.mlx.d") : cm.id === "large" ? t("ai.model.large.d") : cm.id === "installed" ? t("ai.model.local.d") : cm.id === "light" ? t("ai.model.light.d") : t("ai.model.quality.d")}</p>
               <div className="facts">
                 <span className="badge">{isInstalled ? `${t("ai.model.installed")} · ${gb(cm.sizeBytes)}` : t("ai.model.download", { size: gb(cm.sizeBytes) })}</span>
                 {cm.minRamGb !== null && <span className="badge">{t("ai.model.needRam", { ram: cm.minRamGb })}</span>}
@@ -127,7 +127,7 @@ export function LocalModels({ onReady }: { onReady?: (model: string) => void }) 
               {p?.phase === "error" && <span className="small" style={{ color: "var(--danger)" }}>{m(p.message)}</span>}
               <div className="actions-row">
                 {!isInstalled && cm.id !== "installed" && !working && (
-                  <button className="btn btn-primary" disabled={st.status.state !== "running" || !!noDisk} onClick={() => setConfirm(cm)}>
+                  <button className="btn btn-primary" disabled={!compatible || st.status.state !== "running" || !!noDisk} onClick={() => setConfirm(cm)}>
                     {p?.phase === "error" || p?.phase === "cancelled" ? t("ai.model.resume") : t("ai.model.install")}
                   </button>
                 )}

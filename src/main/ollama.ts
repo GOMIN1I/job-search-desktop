@@ -14,7 +14,7 @@ import { EXTRACT_JSON_SCHEMA, EXTRACT_SYSTEM, ExtractSchema, extractUserPrompt }
 export const OLLAMA_BASE = "http://127.0.0.1:11434";
 
 export interface CatalogModel {
-  id: "light" | "quality" | "installed";
+  id: "light" | "quality" | "large" | "large_mlx" | "installed";
   model: string; // имя в Ollama
   title: string;
   minRamGb: number | null;
@@ -26,6 +26,8 @@ export interface CatalogModel {
 export const CATALOG: Array<Omit<CatalogModel, "sizeBytes">> = [
   { id: "light", model: "gemma4:e2b", title: "Gemma 4 E2B", minRamGb: 8, licenseUrl: "https://ollama.com/library/gemma4" },
   { id: "quality", model: "gemma4:e4b", title: "Gemma 4 E4B", minRamGb: 16, licenseUrl: "https://ollama.com/library/gemma4" },
+  { id: "large", model: "gemma4:12b", title: "Gemma 4 12B", minRamGb: null, runtime: "ollama", licenseUrl: "https://ollama.com/library/gemma4" },
+  { id: "large_mlx", model: "gemma4:12b-mlx", title: "Gemma 4 12B", minRamGb: null, runtime: "mlx", licenseUrl: "https://ollama.com/library/gemma4" },
 ];
 
 /** Keep installed Gemma variants selectable under their exact local tag; never invent a registry download. */
@@ -302,6 +304,7 @@ export class OllamaManager {
 
   async pull(model: string, opts: { allowAny?: boolean } = {}): Promise<void> {
     if (!opts.allowAny && !CATALOG.some((c) => c.model === model)) throw new Error(`Модель ${model} не из списка поддержанных`);
+    if (CATALOG.find((c) => c.model === model)?.runtime === "mlx" && (this.platform !== "darwin" || process.arch !== "arm64")) throw new Error("MLX requires a Mac with Apple Silicon");
     const ctrl = this.begin(model);
     try {
       const res = await this.f(`${OLLAMA_BASE}/api/pull`, { method: "POST", body: JSON.stringify({ model, stream: true }), signal: ctrl.signal });

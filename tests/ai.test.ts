@@ -150,3 +150,18 @@ describe("транспорты", () => {
     await expect(new OpenAICompatibleTransport("http://x.local/v1", null, "m", offline as any).complete({ system: "", user: "", schema: {}, maxTokens: 5 })).rejects.toMatchObject({ code: "network" });
   });
 });
+
+
+describe("Gemma в локальной Ollama", () => {
+  it("оставляет бюджет для JSON, не меняя запросы к другим провайдерам", async () => {
+    const bodies: any[] = [];
+    const fetcher = (async (_url, init) => {
+      bodies.push(JSON.parse(init!.body as string));
+      return Response.json({ choices: [{ message: { content: "{}" } }] });
+    }) as typeof fetch;
+    for (const [base, model] of [["http://127.0.0.1:11434/v1", "gemma4:12b-mlx"], ["http://localhost:11434/v1", "gemma4:12b"], ["https://api.example.com/v1", "gemma4:12b"], ["http://localhost:1234/v1", "gemma4:12b"], ["http://localhost:11434/v1", "other"]]) {
+      await new OpenAICompatibleTransport(base, null, model, fetcher).complete({ system: "", user: "", schema: {}, maxTokens: 1500 });
+    }
+    expect(bodies.map((body) => body.reasoning_effort)).toEqual(["none", "none", undefined, undefined, undefined]);
+  });
+});
